@@ -1,0 +1,67 @@
+flowchart LR
+  %% External actors
+  User[/"User (Web UI)"/]
+  ClerkAuth[/"Authentication Service\n(Clerk)"/]
+  ExtServices[/"External Services\nGoogle, Notion, Slack,\nDiscord, Uploadcare, Stripe"/]
+
+  %% Processes (numbered)
+  P1["P1: Authenticate User\n(Clerk + Webhook handler)"]
+  P2["P2: Workflow Manager\n(Create / Edit / Delete,\nOrchestration)"]
+  P3["P3: Triggers\n(Webhooks / Uploads / Scheduler)"]
+  P4["P4: Actions\n(Execute tasks, transform data)"]
+  P5["P5: Integration Layer\n(API clients & Webhook Dispatcher)"]
+  P6["P6: Monitoring + UI\n(Logs, status, audit)"]
+
+  %% Data stores
+  D1[/"D1: User DB\nPostgreSQL (Prisma)"/]
+  D2[/"D2: Workflow Store\nDefinitions & Metadata"/]
+  D3[/"D3: Logs & Results\nExecution history, Audit"/]
+
+  %% Primary flows
+  User -->|login / signup| P1
+  P1 -->|validate & token| ClerkAuth
+  ClerkAuth -->|webhook: user update| D1
+  P1 -->|user context| P2
+
+  User -->|create / edit / delete workflow| P2
+  P2 -->|persist workflow definition| D2
+  P2 -->|register/listen| P3
+
+  %% Event path
+  P3 -->|trigger fires (upload/webhook/schedule)| P2
+  P2 -->|execute workflow| P4
+  P4 -->|invoke APIs / send payloads| P5
+  P5 -->|call external APIs / webhooks| ExtServices
+  ExtServices -->|webhook POST / callbacks| P5
+  P5 -->|read / write user or workflow data| D1
+  P5 -->|store execution result / event| D3
+
+  %% Monitoring & UI
+  P2 -->|update status / logs| D3
+  P4 -->|update execution log| D3
+  P6 -->|view logs / status / results| D3
+  User -->|view dashboard / logs| P6
+  P2 -->|push status updates| P6
+
+  %% Billing (Stripe) – optional path
+  User -->|initiate payment| P4
+  P4 -->|create checkout session| P5
+  P5 -->|Stripe webhook (payment confirmation)| ExtServices
+  ExtServices -->|payment confirmation| P5
+  P5 -->|update subscription| D1
+  P5 -->|log billing event| D3
+
+  %% Webhook external-to-trigger
+  ExtServices -->|external webhook (e.g., Drive, Discord)| P5
+  P5 -->|pass event to trigger engine| P3
+
+  %% Styles for clarity
+  classDef actor fill:#E6EEF7,stroke:#0A2E63,stroke-width:1px,color:#0A2E63,rx:8,ry:8;
+  classDef process fill:#c7d8eb,stroke:#0A2E63,stroke-width:1px,color:#0A2E63,rx:10,ry:10;
+  classDef datastore fill:#E6EEF7,stroke:#0A2E63,stroke-width:1px,color:#0A2E63,rx:8,ry:8;
+  classDef extsvc fill:#ffffff,stroke:#0A2E63,stroke-width:2px,color:#0A2E63,rx:10,ry:10;
+
+  class User,ClerkAuth extsvc;
+  class ExtServices extsvc;
+  class P1,P2,P3,P4,P5,P6 process;
+  class D1,D2,D3 datastore;

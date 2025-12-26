@@ -1,0 +1,87 @@
+flowchart TD
+  subgraph CLIENT["Client"]
+    U["User Browser\n(Next.js client)"]
+    DF["Drag & Drop Editor\n(reactflow)"]
+  end
+
+  subgraph FRONTEND["Frontend (Next.js App)"]
+    FE["Next.js (App Router)\nReact + TypeScript"]
+    UI["UI libs: shadcn/ui, Tailwind\nframer-motion, reactflow"]
+    UPLOAD_C["Uploadcare web component\n(uc-file-uploader-regular)"]
+  end
+
+  subgraph SERVER["Server (Next.js Server)"]
+    API["API Routes & Server Actions\nroute: /api/*, server actions"]
+    MW["Middleware\nclerkMiddleware (custom handler)"]
+    WF["Workflow Manager\nOrchestrator (in-app)"]
+    CRON["Cron / Scheduler endpoints\n/api/cron/*"]
+  end
+
+  subgraph INTEGRATION["Integration Layer"]
+    ADPT["Adapters: Google, Notion, Slack,\nDiscord, Uploadcare, Stripe"]
+    WEBHOOK_ING["Webhook receivers\n/routes: /api/clerk-webhook,\n/api/drive-activity/*, /api/payment/*"]
+  end
+
+  subgraph DATA["Data & Storage"]
+    DB["PostgreSQL (Prisma ORM)"]
+    OBJ["Object Storage (Uploadcare/S3)"]
+    LOGS["Logs & Execution history\nDB table (Prisma)"]
+  end
+
+  subgraph AUTH["Authentication"]
+    CLERK["Clerk (auth provider)\n@clerk/nextjs (server helpers)"]
+  end
+
+  subgraph DEVTOOLS["Dev / Local"]
+    NGROK["NGROK_URI (env) - optional\npublic webhook tunnel"]
+    MKCERT["mkcert for dev HTTPS (optional)"]
+  end
+
+  %% flows
+  U --> FE
+  FE -->|client actions| API
+  DF --> FE
+  FE --> UI
+  FE --> UPLOAD_C
+
+  API --> MW
+  MW --> CLERK
+  CLERK -->|webhook ->| WEBHOOK_ING
+  WEBHOOK_ING --> API
+
+  API --> WF
+  WF --> ADPT
+  ADPT -->|call external APIs| Google[Google]
+  ADPT --> Notion[Notion]
+  ADPT --> Slack[Slack]
+  ADPT --> Discord[Discord]
+  ADPT --> UploadcareSvc[Uploadcare]
+  ADPT --> StripeSvc[Stripe]
+
+  API --> DB
+  WF --> DB
+  ADPT --> DB
+  UPLOAD_C --> OBJ
+  ADPT --> OBJ
+  WF --> LOGS
+  API --> LOGS
+
+  NGROK --> WEBHOOK_ING
+  MKCERT --> FE
+
+  %% styling classes
+  classDef client fill:#ffffff,stroke:#0A2E63,color:#0A2E63,rx:8,ry:8;
+  classDef frontend fill:#0A2E63,stroke:#0A2E63,color:#ffffff,rx:12,ry:12;
+  classDef server fill:#c7d8eb,stroke:#0A2E63,color:#0A2E63,rx:10,ry:10;
+  classDef integration fill:#E6EEF7,stroke:#0A2E63,color:#0A2E63,rx:10,ry:10;
+  classDef data fill:#E6EEF7,stroke:#0A2E63,color:#0A2E63,rx:10,ry:10;
+  classDef auth fill:#ffffff,stroke:#0A2E63,color:#0A2E63,rx:10,ry:10;
+  classDef dev fill:#ffffff,stroke:#0A2E63,color:#0A2E63,rx:8,ry:8;
+
+  class U,DF client;
+  class FE,UI,UPLOAD_C frontend;
+  class API,MW,WF,CRON server;
+  class ADPT,WEBHOOK_ING integration;
+  class DB,OBJ,LOGS data;
+  class CLERK auth;
+  class NGROK,MKCERT dev;

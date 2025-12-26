@@ -1,0 +1,67 @@
+sequenceDiagram
+    participant User as User (Web UI)
+    participant Clerk as Authentication Service (Clerk)
+    participant DB as PostgreSQL (ORM)
+    participant Workflow as Workflow Manager
+    participant Triggers as Triggers (Events)
+    participant Actions as Actions (Tasks)
+    participant Integration as Integration Layer (APIs)
+    participant Monitor as Monitoring + UI
+    participant ExtSvc as External Service (Webhooks/Stripe)
+
+    User->>Clerk: Log in / Sign up
+    Clerk->>DB: Clerk webhook updates user info
+    User->>Workflow: Create/Edit/Delete workflow
+    Workflow->>DB: Save/update workflow definition
+    Workflow->>Triggers: Register/listen for events
+    Triggers-->>Workflow: Trigger fires (event occurs)
+    Workflow->>Actions: Execute actions in workflow
+    Actions->>Integration: Call external APIs (Google, Notion, Slack, Discord, Uploadcare, Stripe)
+    Integration->>DB: Read/write data as needed
+    Workflow->>Monitor: Update status/logs
+    User->>Monitor: View workflow status/logs/results
+
+    %% Optional: Webhook event from external service
+    ExtSvc->>Integration: Webhook POST (e.g., Google Drive, Discord)
+    Integration->>Workflow: Pass event to workflow engine
+
+    %% Optional: Stripe billing flow
+    User->>Actions: Initiate payment
+    Actions->>Integration: Create Stripe checkout session
+    ExtSvc->>Integration: Stripe webhook (payment confirmation)
+    Integration->>DB: Update user subscription
+
+
+    Config:
+    {
+  "theme": "base",
+  "themeVariables": {
+    "background": "#d9d9d9",
+
+    "primaryColor": "#0A2E63",         
+    "primaryTextColor": "#ffffff",     
+    "primaryBorderColor": "#0A2E63",
+
+    "secondaryColor": "#BAD7F2",       
+    "secondaryTextColor": "#0A2E63",   
+    "secondaryBorderColor": "#0A2E63",
+
+    "tertiaryColor": "#c7d8eb",
+    "tertiaryTextColor": "#0A2E63",
+    "tertiaryBorderColor": "#0A2E63",
+
+    "lineColor": "#0A2E63",             
+    "actorBorder": "#0A2E63",           
+    "actorBkg": "#BAD7F2",              
+    "actorTextColor": "#163870",        
+
+    "signalColor": "#0A2E63",           
+    "signalTextColor": "#163870",       
+
+    "activationBorderColor": "#0A2E63",
+    "activationBkgColor": "#BAD7F2",
+
+    "fontFamily": "Inter, Helvetica, Arial, sans-serif",
+    "nodeBorderRadius": "12px"
+  }
+}
