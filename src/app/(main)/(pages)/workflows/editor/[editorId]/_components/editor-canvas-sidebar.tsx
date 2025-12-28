@@ -43,7 +43,7 @@ const EditorCanvasSidebar = ({ nodes }: Props) => {
     if (state?.editor?.selectedNode?.data?.title) {
       onConnections(nodeConnection, state, googleFile)
     }
-  }, [state.editor.selectedNode.data.title, googleFile])
+  }, [state.editor.selectedNode.data.title, googleFile, nodeConnection, state])
 
   // Only fetch Slack channels once when token is available
   useEffect(() => {
@@ -53,7 +53,7 @@ const EditorCanvasSidebar = ({ nodes }: Props) => {
         setSlackChannels
       )
     }
-  }, [nodeConnection.slackNode.slackAccessToken, setSlackChannels])
+  }, [nodeConnection.slackNode.slackAccessToken, setSlackChannels, nodeConnection])
 
   return (
     <aside className="h-full flex flex-col overflow-hidden">
