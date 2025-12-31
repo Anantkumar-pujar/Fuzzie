@@ -9,7 +9,7 @@ const Workflows = async (props: Props) => {
   const workflows = await onGetWorkflows()
   return (
     <div className="relative flex flex-col gap-4">
-      <section className="flex flex-col gap-4 m-2">
+      <section className="flex flex-col gap-4 p-6 pb-8">
         <MoreCredits />
         {workflows?.length ? (
           workflows.map((flow) => (

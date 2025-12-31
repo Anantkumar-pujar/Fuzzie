@@ -97,7 +97,7 @@ const LogsPage = () => {
         Execution History
       </h1>
 
-      <div className="flex flex-col gap-6 p-8">
+      <div className="flex flex-col gap-6 p-6 pb-8">
         {/* Filters */}
         <div className="flex gap-4 items-center">
           <div className="flex-1 relative">
