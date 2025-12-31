@@ -24,7 +24,6 @@ model User {
   updatedAt        DateTime @updatedAt
   localGoogleId    String?  @unique
   googleResourceId String?  @unique
-  googleWebhookExpiration DateTime?
 
   LocalGoogleCredential LocalGoogleCredential?
   DiscordWebhook        DiscordWebhook[]

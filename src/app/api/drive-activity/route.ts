@@ -17,28 +17,23 @@ export async function GET() {
   }
 
   try {
-    // Check if listener is already active and not expired
+    // Check if listener is already active
     const existingUser = await db.user.findUnique({
       where: { clerkId: userId },
       select: { 
         googleResourceId: true,
-        googleWebhookExpiration: true,
       },
     })
 
-    if (existingUser?.googleResourceId && existingUser.googleWebhookExpiration) {
-      const isExpired = new Date() > existingUser.googleWebhookExpiration
-      
-      if (!isExpired) {
-        return NextResponse.json(
-          { 
-            message: 'Google Drive listener is already active',
-            resourceId: existingUser.googleResourceId,
-            alreadyActive: true,
-          },
-          { status: 200 }
-        )
-      }
+    if (existingUser?.googleResourceId) {
+      return NextResponse.json(
+        { 
+          message: 'Google Drive listener is already active',
+          resourceId: existingUser.googleResourceId,
+          alreadyActive: true,
+        },
+        { status: 200 }
+      )
     }
 
     const clerk = await clerkClient()
@@ -87,25 +82,19 @@ export async function GET() {
     })
 
     if (listener.status === 200 && listener.data.resourceId) {
-      const expirationTime = listener.data.expiration 
-        ? new Date(parseInt(listener.data.expiration))
-        : new Date(Date.now() + 24 * 60 * 60 * 1000)
-      
       const channelStored = await db.user.updateMany({
         where: { clerkId: userId },
         data: { 
           googleResourceId: listener.data.resourceId,
-          googleWebhookExpiration: expirationTime,
         },
       })
 
       if (channelStored.count > 0) {
-        console.log(`Google Drive listener activated for user ${userId}, expires: ${expirationTime.toISOString()}`)
+        console.log(`Google Drive listener activated for user ${userId}`)
         return NextResponse.json(
           {
             message: 'Google Drive listener activated successfully!',
             resourceId: listener.data.resourceId,
-            expiresAt: listener.data.expiration,
           },
           { status: 200 }
         )

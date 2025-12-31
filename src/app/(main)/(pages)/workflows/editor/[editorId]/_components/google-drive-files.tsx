@@ -12,8 +12,6 @@ type Props = {}
 const GoogleDriveFiles = (props: Props) => {
   const [loading, setLoading] = useState(false)
   const [isListening, setIsListening] = useState(false)
-  const [isExpired, setIsExpired] = useState(false)
-  const [expiresIn, setExpiresIn] = useState(0)
 
   const reqGoogle = async () => {
     setLoading(true)
@@ -28,12 +26,9 @@ const GoogleDriveFiles = (props: Props) => {
   const onListener = async () => {
     const listener = await getGoogleListener()
     if (listener?.googleResourceId !== null) {
-      setIsListening(!listener.isExpired)
-      setIsExpired(listener.isExpired || false)
-      setExpiresIn(listener.expiresIn || 0)
+      setIsListening(true)
     } else {
       setIsListening(false)
-      setIsExpired(false)
     }
   }
 
@@ -47,32 +42,8 @@ const GoogleDriveFiles = (props: Props) => {
         <Card className="py-3">
           <CardContainer>
             <CardDescription>
-              ✓ Listening... 
-              {expiresIn > 0 && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (expires in {Math.floor(expiresIn / (1000 * 60 * 60))}h)
-                </span>
-              )}
+              ✓ Listening...
             </CardDescription>
-          </CardContainer>
-        </Card>
-      ) : isExpired ? (
-        <Card className="py-3 border-yellow-500/50">
-          <CardContainer>
-            <div className="flex flex-col gap-2">
-              <CardDescription className="text-yellow-500">
-                ⚠️ Webhook expired - Click below to reactivate
-              </CardDescription>
-              <Button
-                variant="outline"
-                size="sm"
-                {...(!loading && {
-                  onClick: reqGoogle,
-                })}
-              >
-                {loading ? 'Reactivating...' : 'Reactivate Listener'}
-              </Button>
-            </div>
           </CardContainer>
         </Card>
       ) : (

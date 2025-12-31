@@ -13,23 +13,11 @@ export const getGoogleListener = async () => {
       },
       select: {
         googleResourceId: true,
-        googleWebhookExpiration: true,
       },
     })
 
     if (listener) {
-      // Check if webhook has expired
-      const isExpired = listener.googleWebhookExpiration 
-        ? new Date() > listener.googleWebhookExpiration
-        : true
-      
-      return {
-        ...listener,
-        isExpired,
-        expiresIn: listener.googleWebhookExpiration
-          ? Math.max(0, listener.googleWebhookExpiration.getTime() - Date.now())
-          : 0,
-      }
+      return listener
     }
   }
 }
