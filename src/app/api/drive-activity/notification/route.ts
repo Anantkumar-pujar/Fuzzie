@@ -126,19 +126,19 @@ export async function POST(req: NextRequest) {
     // Execute all workflows
     const results = await Promise.allSettled(
       workflows.map(async (flow) => {
+        const workflowStartTime = Date.now()
+        const actionsExecuted: any[] = []
+        
         try {
-          console.log(`▶️ Executing workflow: ${flow.name} (${flow.id})`)
+          console.log(`Executing workflow: ${flow.name}`)
           
           if (!flow.flowPath) {
-            console.warn(`⚠️ Workflow ${flow.id} has no flowPath`)
             return { success: false, error: 'No flowPath defined' }
           }
 
           const flowPath = JSON.parse(flow.flowPath)
           
           // Execute all actions in the flow path
-          // With multiple incoming connections, actions may appear multiple times
-          // We'll execute each action once (deduplication handled by array traversal)
           const executedActions = new Set<string>()
           let current = 0
 
@@ -147,12 +147,12 @@ export async function POST(req: NextRequest) {
             
             // Skip if already executed (for parallel paths that converge)
             if (executedActions.has(action)) {
-              console.log(`  ⏭️ Skipping ${action} (already executed)`)
+              console.log(`  Skipping ${action} (already executed)`)
               flowPath.splice(current, 1)
               continue
             }
             
-            console.log(`  ➜ Executing action: ${action}`)
+            console.log(`  Executing action: ${action}`)
             executedActions.add(action)
 
             try {
@@ -162,14 +162,13 @@ export async function POST(req: NextRequest) {
                   select: { url: true },
                 })
                 
-                console.log(`  🔍 Checking Discord config: webhook=${!!discordMessage?.url}, template=${!!flow.discordTemplate}`)
-                
                 if (discordMessage?.url && flow.discordTemplate) {
-                  console.log(`  📤 Sending to Discord webhook: ${discordMessage.url.substring(0, 50)}...`)
                   await postContentToWebHook(flow.discordTemplate, discordMessage.url)
-                  console.log(`  ✓ Discord message sent`)
+                  console.log(`  Discord message sent`)
+                  actionsExecuted.push({ action: 'Discord', status: 'success', timestamp: new Date() })
                 } else {
-                  console.warn(`  ⚠️ Discord configuration incomplete: webhook=${!!discordMessage?.url}, template=${!!flow.discordTemplate}`)
+                  console.warn(`  Discord config incomplete`)
+                  actionsExecuted.push({ action: 'Discord', status: 'skipped', reason: 'Incomplete configuration' })
                 }
                 flowPath.splice(current, 1)
                 continue
@@ -188,8 +187,10 @@ export async function POST(req: NextRequest) {
                     flow.slackTemplate
                   )
                   console.log(`  Slack sent to ${flow.slackChannels.length} channel(s)`)
+                  actionsExecuted.push({ action: 'Slack', status: 'success', channels: flow.slackChannels.length, timestamp: new Date() })
                 } else {
                   console.warn(`  Slack config incomplete`)
+                  actionsExecuted.push({ action: 'Slack', status: 'skipped', reason: 'Incomplete configuration' })
                 }
                 flowPath.splice(current, 1)
                 continue
@@ -204,11 +205,14 @@ export async function POST(req: NextRequest) {
                       JSON.parse(flow.notionTemplate)
                     )
                     console.log(`  Notion page created`)
+                    actionsExecuted.push({ action: 'Notion', status: 'success', databaseId: flow.notionDbId, timestamp: new Date() })
                   } catch (notionError: any) {
                     console.error(`  Notion error: ${notionError.message}`)
+                    actionsExecuted.push({ action: 'Notion', status: 'failed', error: notionError.message })
                   }
                 } else {
                   console.warn(`  Notion config incomplete`)
+                  actionsExecuted.push({ action: 'Notion', status: 'skipped', reason: 'Incomplete configuration' })
                 }
                 flowPath.splice(current, 1)
                 continue
@@ -254,13 +258,49 @@ export async function POST(req: NextRequest) {
               current++
             } catch (actionError: any) {
               console.error(`  ${action} error: ${actionError.message}`)
+              actionsExecuted.push({ action, status: 'failed', error: actionError.message })
               flowPath.splice(current, 1)
             }
           }
 
+          const workflowEndTime = Date.now()
+          const executionTime = workflowEndTime - workflowStartTime
+          
+          // Save execution log
+          await db.workflowExecution.create({
+            data: {
+              workflowId: flow.id,
+              status: 'success',
+              triggeredBy: 'google_drive',
+              triggerData: JSON.stringify({
+                resourceId: channelResourceId,
+                messageNumber,
+              }),
+              executedActions: JSON.stringify(actionsExecuted),
+              executionTime,
+            },
+          })
+
           return { success: true, workflowId: flow.id }
         } catch (flowError: any) {
           console.error(`Workflow ${flow.name} error: ${flowError.message}`)
+          
+          // Save failed execution log
+          await db.workflowExecution.create({
+            data: {
+              workflowId: flow.id,
+              status: 'failed',
+              triggeredBy: 'google_drive',
+              triggerData: JSON.stringify({
+                resourceId: channelResourceId,
+                messageNumber,
+              }),
+              executedActions: JSON.stringify(actionsExecuted),
+              error: flowError.message,
+              executionTime: Date.now() - workflowStartTime,
+            },
+          })
+          
           return { success: false, workflowId: flow.id, error: flowError.message }
         }
       })

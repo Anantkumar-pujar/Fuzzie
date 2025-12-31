@@ -125,4 +125,22 @@ model Workflows {
   updatedAt         DateTime @updatedAt
   User              User     @relation(fields: [userId], references: [clerkId])
   userId            String
+  executions        WorkflowExecution[]
+}
+
+model WorkflowExecution {
+  id            String   @id @default(uuid())
+  workflowId    String
+  workflow      Workflows @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status        String   // 'success', 'failed', 'partial'
+  triggeredBy   String   // 'google_drive', 'manual', 'cron'
+  triggerData   String?  // JSON string with trigger details
+  executedActions String // JSON array of executed actions with results
+  error         String?
+  creditsUsed   Int      @default(1)
+  executionTime Int?     // Duration in milliseconds
+  createdAt     DateTime @default(now())
+
+  @@index([workflowId])
+  @@index([createdAt])
 }
