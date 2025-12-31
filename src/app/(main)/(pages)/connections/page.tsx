@@ -58,11 +58,8 @@ const Connections = async (props: Props) => {
 
   const onUserConnections = async () => {
     try {
-      console.log('Starting connection setup...')
-      
       // Only connect if we have the required params
       if (webhook_id && channel_id) {
-        console.log('Connecting Discord...')
         await onDiscordConnect(
           channel_id,
           webhook_id,
@@ -75,7 +72,6 @@ const Connections = async (props: Props) => {
       }
 
       if (access_token && workspace_id) {
-        console.log('Connecting Notion...')
         await onNotionConnect(
           access_token,
           workspace_id,
@@ -87,7 +83,6 @@ const Connections = async (props: Props) => {
       }
 
       if (slack_access_token) {
-        console.log('Connecting Slack...')
         await onSlackConnect(
           app_id || '',
           authed_user_id || '',
@@ -100,10 +95,7 @@ const Connections = async (props: Props) => {
         )
       }
 
-      console.log('Getting user data...')
       const user_info = await getUserData(user.id)
-      console.log('User info:', user_info)
-
       const connections: any = {}
 
       //get user info with all connections
@@ -112,11 +104,9 @@ const Connections = async (props: Props) => {
       })
 
       // Google Drive connection will always be true
-      // as it is given access during the login process
       return { ...connections, 'Google Drive': true }
     } catch (error) {
       console.error('Error in onUserConnections:', error)
-      // Return default state on error so page still renders
       return { 'Google Drive': true }
     }
   }

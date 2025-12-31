@@ -6,21 +6,49 @@ import axios from 'axios'
 import { headers } from 'next/headers'
 import { NextRequest } from 'next/server'
 
+// In-memory cache for processed message numbers (reset on server restart)
+const processedMessages = new Set<string>()
+
+// Rate limiting: track last execution time per user (userId -> timestamp)
+const lastExecutionTime = new Map<string, number>()
+const COOLDOWN_PERIOD = 10000 // 10 seconds cooldown between workflow executions per user
+
 export async function POST(req: NextRequest) {
-  console.log('🔴 Google Drive Change Detected')
+  console.log('Google Drive notification received')
   
   try {
     const headersList = headers()
     let channelResourceId: string | undefined
+    let messageNumber: string | undefined
     
     headersList.forEach((value, key) => {
-      if (key === 'x-goog-resource-id') {
-        channelResourceId = value
-      }
+      if (key === 'x-goog-resource-id') channelResourceId = value
+      if (key === 'x-goog-message-number') messageNumber = value
     })
+    
+    // Check for duplicate message
+    if (messageNumber && processedMessages.has(messageNumber)) {
+      console.log(`Duplicate message ${messageNumber} - skipping`)
+      return Response.json(
+        { message: 'Duplicate message ignored' },
+        { status: 200 }
+      )
+    }
+    
+    // Mark message as processed
+    if (messageNumber) {
+      processedMessages.add(messageNumber)
+      // Clean up old messages (keep last 1000)
+      if (processedMessages.size > 1000) {
+        const iterator = processedMessages.values()
+        for (let i = 0; i < 100; i++) {
+          const nextValue = iterator.next().value
+          if (nextValue) processedMessages.delete(nextValue)
+        }
+      }
+    }
 
     if (!channelResourceId) {
-      console.warn('⚠️ No x-goog-resource-id header found')
       return Response.json(
         { message: 'No resource ID provided' },
         { status: 400 }
@@ -36,18 +64,42 @@ export async function POST(req: NextRequest) {
     })
 
     if (!user) {
-      console.warn(`⚠️ No user found for resource ID: ${channelResourceId}`)
       return Response.json(
         { message: 'User not found' },
         { status: 404 }
       )
     }
 
+    // Rate limiting: check if user executed workflow recently
+    const now = Date.now()
+    const lastExecution = lastExecutionTime.get(user.clerkId)
+    
+    if (lastExecution && (now - lastExecution) < COOLDOWN_PERIOD) {
+      const remainingCooldown = Math.ceil((COOLDOWN_PERIOD - (now - lastExecution)) / 1000)
+      console.log(`Rate limit: ${remainingCooldown}s cooldown remaining`)
+      return Response.json(
+        { message: `Rate limited. Please wait ${remainingCooldown} seconds.` },
+        { status: 429 }
+      )
+    }
+
+    // Update last execution time
+    lastExecutionTime.set(user.clerkId, now)
+    
+    // Clean up old entries (keep last 100 users)
+    if (lastExecutionTime.size > 100) {
+      const entries = Array.from(lastExecutionTime.entries())
+      entries.sort((a, b) => b[1] - a[1])
+      lastExecutionTime.clear()
+      entries.slice(0, 100).forEach(([userId, timestamp]) => {
+        lastExecutionTime.set(userId, timestamp)
+      })
+    }
+
     // Check if user has credits
     const hasCredits = user.credits === 'Unlimited' || parseInt(user.credits || '0') > 0
     
     if (!hasCredits) {
-      console.warn(`⚠️ User ${user.clerkId} has insufficient credits`)
       return Response.json(
         { message: 'Insufficient credits' },
         { status: 403 }
@@ -63,14 +115,13 @@ export async function POST(req: NextRequest) {
     })
 
     if (!workflows || workflows.length === 0) {
-      console.log(`ℹ️ No published workflows found for user ${user.clerkId}`)
       return Response.json(
         { message: 'No published workflows to execute' },
         { status: 200 }
       )
     }
 
-    console.log(`✅ Found ${workflows.length} published workflow(s) to execute`)
+    console.log(`Executing ${workflows.length} workflow(s)`)
 
     // Execute all workflows
     const results = await Promise.allSettled(
@@ -111,18 +162,21 @@ export async function POST(req: NextRequest) {
                   select: { url: true },
                 })
                 
-                if (discordMessage && flow.discordTemplate) {
+                console.log(`  🔍 Checking Discord config: webhook=${!!discordMessage?.url}, template=${!!flow.discordTemplate}`)
+                
+                if (discordMessage?.url && flow.discordTemplate) {
+                  console.log(`  📤 Sending to Discord webhook: ${discordMessage.url.substring(0, 50)}...`)
                   await postContentToWebHook(flow.discordTemplate, discordMessage.url)
                   console.log(`  ✓ Discord message sent`)
                 } else {
-                  console.warn(`  ⚠️ Discord webhook or template missing`)
+                  console.warn(`  ⚠️ Discord configuration incomplete: webhook=${!!discordMessage?.url}, template=${!!flow.discordTemplate}`)
                 }
                 flowPath.splice(current, 1)
                 continue
               }
 
               if (action === 'Slack') {
-                if (flow.slackAccessToken && flow.slackChannels.length > 0 && flow.slackTemplate) {
+                if (flow.slackAccessToken && flow.slackChannels && flow.slackChannels.length > 0 && flow.slackTemplate) {
                   const channels = flow.slackChannels.map((channel) => ({
                     label: '',
                     value: channel,
@@ -133,32 +187,34 @@ export async function POST(req: NextRequest) {
                     channels,
                     flow.slackTemplate
                   )
-                  console.log(`  ✓ Slack message sent to ${flow.slackChannels.length} channel(s)`)
+                  console.log(`  Slack sent to ${flow.slackChannels.length} channel(s)`)
                 } else {
-                  console.warn(`  ⚠️ Slack configuration incomplete`)
+                  console.warn(`  Slack config incomplete`)
                 }
                 flowPath.splice(current, 1)
                 continue
               }
 
               if (action === 'Notion') {
-                if (flow.notionDbId && flow.notionAccessToken && flow.notionTemplate) {
-                  await onCreateNewPageInDatabase(
-                    flow.notionDbId,
-                    flow.notionAccessToken,
-                    JSON.parse(flow.notionTemplate)
-                  )
-                  console.log(`  ✓ Notion page created`)
+                if (flow.notionDbId && flow.notionDbId.trim() !== '' && flow.notionAccessToken && flow.notionTemplate) {
+                  try {
+                    await onCreateNewPageInDatabase(
+                      flow.notionDbId.trim(),
+                      flow.notionAccessToken,
+                      JSON.parse(flow.notionTemplate)
+                    )
+                    console.log(`  Notion page created`)
+                  } catch (notionError: any) {
+                    console.error(`  Notion error: ${notionError.message}`)
+                  }
                 } else {
-                  console.warn(`  ⚠️ Notion configuration incomplete`)
+                  console.warn(`  Notion config incomplete`)
                 }
                 flowPath.splice(current, 1)
                 continue
               }
 
               if (action === 'Wait') {
-                console.log(`  ⏱️ Setting up cron job for delayed execution`)
-                
                 const res = await axios.put(
                   'https://api.cron-job.org/jobs',
                   {
@@ -190,45 +246,43 @@ export async function POST(req: NextRequest) {
                     where: { id: flow.id },
                     data: { cronPath: JSON.stringify(flowPath) },
                   })
-                  console.log(`  ✓ Cron job created, remaining actions stored`)
+                  console.log(`  Cron job scheduled`)
                 }
                 break
               }
 
               current++
             } catch (actionError: any) {
-              console.error(`  ❌ Error executing ${action}:`, actionError.message)
-              // Continue to next action even if one fails
+              console.error(`  ${action} error: ${actionError.message}`)
               flowPath.splice(current, 1)
             }
           }
 
-          console.log(`✅ Workflow ${flow.name} completed`)
           return { success: true, workflowId: flow.id }
         } catch (flowError: any) {
-          console.error(`❌ Error executing workflow ${flow.id}:`, flowError.message)
+          console.error(`Workflow ${flow.name} error: ${flowError.message}`)
           return { success: false, workflowId: flow.id, error: flowError.message }
         }
       })
     )
 
-    // Deduct 1 credit per trigger event (not per workflow)
+    // Deduct 1 credit per trigger event
     if (user.credits !== 'Unlimited') {
       try {
         await db.user.update({
           where: { clerkId: user.clerkId },
           data: { credits: `${parseInt(user.credits!) - 1}` },
         })
-        console.log(`💳 Deducted 1 credit from user ${user.clerkId}`)
+        console.log(`Credit deducted`)
       } catch (creditError: any) {
-        console.error(`❌ Error deducting credits:`, creditError.message)
+        console.error(`Credit deduction error: ${creditError.message}`)
       }
     }
 
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length
     const failCount = results.length - successCount
 
-    console.log(`📊 Execution summary: ${successCount} succeeded, ${failCount} failed`)
+    console.log(`Workflows complete: ${successCount} succeeded, ${failCount} failed`)
 
     return Response.json(
       {
@@ -241,7 +295,7 @@ export async function POST(req: NextRequest) {
     )
 
   } catch (error: any) {
-    console.error('❌ Fatal error in notification handler:', error)
+    console.error('Notification handler error:', error.message)
     return Response.json(
       {
         message: 'Internal server error',

@@ -13,15 +13,28 @@ export const getGoogleListener = async () => {
       },
       select: {
         googleResourceId: true,
+        googleWebhookExpiration: true,
       },
     })
 
-    if (listener) return listener
+    if (listener) {
+      // Check if webhook has expired
+      const isExpired = listener.googleWebhookExpiration 
+        ? new Date() > listener.googleWebhookExpiration
+        : true
+      
+      return {
+        ...listener,
+        isExpired,
+        expiresIn: listener.googleWebhookExpiration
+          ? Math.max(0, listener.googleWebhookExpiration.getTime() - Date.now())
+          : 0,
+      }
+    }
   }
 }
 
 export const onFlowPublish = async (workflowId: string, state: boolean) => {
-  console.log(state)
   const published = await db.workflows.update({
     where: {
       id: workflowId,
@@ -58,6 +71,18 @@ export const onCreateNodeTemplate = async (
     }
   }
   if (type === 'Slack') {
+    // Get current channels
+    const workflow = await db.workflows.findUnique({
+      where: { id: workflowId },
+      select: { slackChannels: true },
+    })
+
+    // Combine existing channels with new ones and remove duplicates
+    const existingChannels = workflow?.slackChannels || []
+    const newChannelValues = channels?.map(c => c.value) || []
+    const allChannels = Array.from(new Set([...existingChannels, ...newChannelValues]))
+
+    // Update workflow with template, token, and all channels in one operation
     const response = await db.workflows.update({
       where: {
         id: workflowId,
@@ -65,56 +90,11 @@ export const onCreateNodeTemplate = async (
       data: {
         slackTemplate: content,
         slackAccessToken: accessToken,
+        slackChannels: allChannels,
       },
     })
 
     if (response) {
-      const channelList = await db.workflows.findUnique({
-        where: {
-          id: workflowId,
-        },
-        select: {
-          slackChannels: true,
-        },
-      })
-
-      if (channelList) {
-        //remove duplicates before insert
-        const NonDuplicated = channelList.slackChannels.filter(
-          (channel: string) => channel !== channels![0].value
-        )
-
-        NonDuplicated!
-          .map((channel: string) => channel)
-          .forEach(async (channel: string) => {
-            await db.workflows.update({
-              where: {
-                id: workflowId,
-              },
-              data: {
-                slackChannels: {
-                  push: channel,
-                },
-              },
-            })
-          })
-
-        return 'Slack template saved'
-      }
-      channels!
-        .map((channel) => channel.value)
-        .forEach(async (channel: string) => {
-          await db.workflows.update({
-            where: {
-              id: workflowId,
-            },
-            data: {
-              slackChannels: {
-                push: channel,
-              },
-            },
-          })
-        })
       return 'Slack template saved'
     }
   }
@@ -127,7 +107,7 @@ export const onCreateNodeTemplate = async (
       data: {
         notionTemplate: content,
         notionAccessToken: accessToken,
-        notionDbId: notionDbId,
+        notionDbId: notionDbId || null,
       },
     })
 
@@ -177,6 +157,13 @@ export const onGetNodesEdges = async (flowId: string) => {
     select: {
       nodes: true,
       edges: true,
+      discordTemplate: true,
+      slackTemplate: true,
+      notionTemplate: true,
+      slackChannels: true,
+      slackAccessToken: true,
+      notionAccessToken: true,
+      notionDbId: true,
     },
   })
   if (nodesEdges?.nodes && nodesEdges?.edges) return nodesEdges

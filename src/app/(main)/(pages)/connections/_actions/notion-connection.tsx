@@ -77,28 +77,36 @@ export const getNotionDatabase = async (
 export const onCreateNewPageInDatabase = async (
   databaseId: string,
   accessToken: string,
-  content: string
+  content: string | { [key: string]: any }
 ) => {
+  if (!databaseId || databaseId === '') {
+    throw new Error('Database ID is required but was empty or undefined')
+  }
+
   const notion = new Client({
     auth: accessToken,
   })
+  
+  const contentText = typeof content === 'string' ? content : content.content || JSON.stringify(content)
 
-  console.log(databaseId)
   const response = await notion.pages.create({
     parent: {
       type: 'database_id',
       database_id: databaseId,
     },
     properties: {
-      name: [
-        {
-          text: {
-            content: content,
+      Name: {
+        title: [
+          {
+            text: {
+              content: contentText,
+            },
           },
-        },
-      ],
+        ],
+      },
     },
   })
+  
   if (response) {
     return response
   }

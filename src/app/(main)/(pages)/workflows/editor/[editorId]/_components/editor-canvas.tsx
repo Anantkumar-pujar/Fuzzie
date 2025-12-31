@@ -1,6 +1,7 @@
 'use client'
 import { EditorCanvasCardType, EditorNodeType } from '@/lib/types'
 import { useEditor } from '@/providers/editor-provider'
+import { useNodeConnections } from '@/providers/connections-provider'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ReactFlow, {
   Background,
@@ -38,12 +39,16 @@ const initialEdges: { id: string; source: string; target: string }[] = []
 
 const EditorCanvas = (props: Props) => {
   const { dispatch, state } = useEditor()
+  const { nodeConnection } = useNodeConnections()
   const [nodes, setNodes] = useState(initialNodes)
   const [edges, setEdges] = useState(initialEdges)
   const [isWorkFlowLoading, setIsWorkFlowLoading] = useState<boolean>(false)
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance>()
   const pathname = usePathname()
+  
+  // Extract setters to avoid nodeConnection dependency issues
+  const { setDiscordNode, setSlackNode, setNotionNode, setWorkFlowTemplate } = nodeConnection
 
   const onDragOver = useCallback((event: any) => {
     event.preventDefault()
@@ -232,10 +237,42 @@ const EditorCanvas = (props: Props) => {
         payload: { edges: loadedEdges, elements: loadedNodes } 
       })
       
+      // Load saved templates into connection state
+      if (response.discordTemplate) {
+        setDiscordNode((prev: any) => ({
+          ...prev,
+          content: response.discordTemplate,
+        }))
+      }
+      
+      if (response.slackTemplate) {
+        setSlackNode((prev: any) => ({
+          ...prev,
+          content: response.slackTemplate,
+          slackAccessToken: response.slackAccessToken || '',
+        }))
+      }
+      
+      if (response.notionTemplate) {
+        setNotionNode((prev: any) => ({
+          ...prev,
+          content: response.notionTemplate,
+          accessToken: response.notionAccessToken || '',
+          databaseId: response.notionDbId || '',
+        }))
+      }
+      
+      // Also set the workflow template state
+      setWorkFlowTemplate({
+        discord: response.discordTemplate || '',
+        slack: response.slackTemplate || '',
+        notion: response.notionTemplate || '',
+      })
+      
       setIsWorkFlowLoading(false)
     }
     setIsWorkFlowLoading(false)
-  }, [pathname, dispatch])
+  }, [pathname, dispatch, setDiscordNode, setSlackNode, setNotionNode, setWorkFlowTemplate])
 
   useEffect(() => {
     onGetWorkFlow()

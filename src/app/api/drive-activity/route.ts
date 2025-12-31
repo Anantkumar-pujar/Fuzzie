@@ -5,8 +5,6 @@ import { v4 as uuidv4 } from 'uuid'
 import { db } from '@/lib/db'
 
 export async function GET() {
-  console.log('🔵 Setting up Google Drive listener...')
-  
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -15,30 +13,34 @@ export async function GET() {
 
   const { userId } = await auth()
   if (!userId) {
-    console.warn('⚠️ Unauthorized request - no user ID')
     return NextResponse.json({ message: 'User not found' }, { status: 401 })
   }
 
   try {
-    // Check if listener is already active
+    // Check if listener is already active and not expired
     const existingUser = await db.user.findUnique({
       where: { clerkId: userId },
-      select: { googleResourceId: true },
+      select: { 
+        googleResourceId: true,
+        googleWebhookExpiration: true,
+      },
     })
 
-    if (existingUser?.googleResourceId) {
-      console.log(`✅ Listener already active for user ${userId}`)
-      return NextResponse.json(
-        { 
-          message: 'Google Drive listener is already active',
-          resourceId: existingUser.googleResourceId,
-          alreadyActive: true,
-        },
-        { status: 200 }
-      )
+    if (existingUser?.googleResourceId && existingUser.googleWebhookExpiration) {
+      const isExpired = new Date() > existingUser.googleWebhookExpiration
+      
+      if (!isExpired) {
+        return NextResponse.json(
+          { 
+            message: 'Google Drive listener is already active',
+            resourceId: existingUser.googleResourceId,
+            alreadyActive: true,
+          },
+          { status: 200 }
+        )
+      }
     }
 
-    console.log(`📡 Fetching Google OAuth token for user ${userId}...`)
     const clerk = await clerkClient()
     const clerkResponse = await clerk.users.getUserOauthAccessToken(
       userId,
@@ -46,7 +48,6 @@ export async function GET() {
     )
 
     if (!clerkResponse || !clerkResponse.data || clerkResponse.data.length === 0) {
-      console.error('❌ No Google OAuth token found')
       return NextResponse.json(
         { message: 'No Google OAuth token found. Please connect Google Drive in your connections.' },
         { status: 400 }
@@ -63,7 +64,6 @@ export async function GET() {
       auth: oauth2Client,
     })
     
-    console.log('🔑 Getting start page token...')
     const startPageTokenRes = await drive.changes.getStartPageToken({})
     const startPageToken = startPageTokenRes.data.startPageToken
     
@@ -73,8 +73,6 @@ export async function GET() {
 
     const channelId = uuidv4()
     const webhookUrl = `${process.env.NGROK_URI}/api/drive-activity/notification`
-    
-    console.log(`📞 Creating webhook listener at: ${webhookUrl}`)
     
     const listener = await drive.changes.watch({
       pageToken: startPageToken,
@@ -89,15 +87,20 @@ export async function GET() {
     })
 
     if (listener.status === 200 && listener.data.resourceId) {
-      console.log(`💾 Storing resource ID: ${listener.data.resourceId}`)
+      const expirationTime = listener.data.expiration 
+        ? new Date(parseInt(listener.data.expiration))
+        : new Date(Date.now() + 24 * 60 * 60 * 1000)
       
       const channelStored = await db.user.updateMany({
         where: { clerkId: userId },
-        data: { googleResourceId: listener.data.resourceId },
+        data: { 
+          googleResourceId: listener.data.resourceId,
+          googleWebhookExpiration: expirationTime,
+        },
       })
 
       if (channelStored.count > 0) {
-        console.log(`✅ Google Drive listener activated successfully for user ${userId}`)
+        console.log(`Google Drive listener activated for user ${userId}, expires: ${expirationTime.toISOString()}`)
         return NextResponse.json(
           {
             message: 'Google Drive listener activated successfully!',
@@ -114,9 +117,8 @@ export async function GET() {
     throw new Error('Failed to create Google Drive webhook listener')
     
   } catch (error: any) {
-    console.error('❌ Google Drive Activity API error:', error)
+    console.error('Google Drive listener error:', error.message)
     
-    // Provide more specific error messages
     let errorMessage = 'Failed to set up Google Drive activity listener'
     
     if (error.code === 'ENOTFOUND' || error.message?.includes('NGROK_URI')) {

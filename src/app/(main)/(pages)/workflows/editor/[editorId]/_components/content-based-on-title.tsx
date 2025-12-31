@@ -16,6 +16,7 @@ import GoogleFileDetails from './google-file-details'
 import GoogleDriveFiles from './google-drive-files'
 import ActionButton from './action-button'
 import { getFileMetaData } from '@/app/(main)/(pages)/connections/_actions/google-connection'
+import { getNotionConnection } from '@/app/(main)/(pages)/connections/_actions/notion-connection'
 import axios from 'axios'
 import { toast } from 'sonner'
 
@@ -58,7 +59,6 @@ const ContentBasedOnTitle = ({
         '/api/drive'
       )
       if (response) {
-        console.log(response.data.message.files[0])
         toast.message("Fetched File")
         setFile(response.data.message.files[0])
       } else {
@@ -67,6 +67,24 @@ const ContentBasedOnTitle = ({
     }
     reqGoogle()
   }, [setFile])
+
+  // Load Notion connection data when Notion node is selected
+  useEffect(() => {
+    const loadNotionConnection = async () => {
+      if (title === 'Notion') {
+        const connection = await getNotionConnection()
+        if (connection && connection.databaseId) {
+          nodeConnection.setNotionNode((prev: any) => ({
+            ...prev,
+            accessToken: connection.accessToken,
+            databaseId: connection.databaseId,
+            workspaceName: connection.workspaceName,
+          }))
+        }
+      }
+    }
+    loadNotionConnection()
+  }, [title])
 
   // @ts-ignore
   const nodeConnectionType: any = nodeConnection[nodeMapper[title]]

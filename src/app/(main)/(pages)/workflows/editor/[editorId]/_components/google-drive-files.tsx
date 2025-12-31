@@ -12,22 +12,28 @@ type Props = {}
 const GoogleDriveFiles = (props: Props) => {
   const [loading, setLoading] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [isExpired, setIsExpired] = useState(false)
+  const [expiresIn, setExpiresIn] = useState(0)
 
   const reqGoogle = async () => {
     setLoading(true)
     const response = await axios.get('/api/drive-activity')
     if (response) {
-      toast.message(response.data)
+      toast.message(response.data.message || 'Google Drive listener setup complete')
       setLoading(false)
-      setIsListening(true)
+      await onListener() // Refresh listener status
     }
-    setIsListening(false)
   }
 
   const onListener = async () => {
     const listener = await getGoogleListener()
     if (listener?.googleResourceId !== null) {
-      setIsListening(true)
+      setIsListening(!listener.isExpired)
+      setIsExpired(listener.isExpired || false)
+      setExpiresIn(listener.expiresIn || 0)
+    } else {
+      setIsListening(false)
+      setIsExpired(false)
     }
   }
 
@@ -40,7 +46,33 @@ const GoogleDriveFiles = (props: Props) => {
       {isListening ? (
         <Card className="py-3">
           <CardContainer>
-            <CardDescription>Listening...</CardDescription>
+            <CardDescription>
+              ✓ Listening... 
+              {expiresIn > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (expires in {Math.floor(expiresIn / (1000 * 60 * 60))}h)
+                </span>
+              )}
+            </CardDescription>
+          </CardContainer>
+        </Card>
+      ) : isExpired ? (
+        <Card className="py-3 border-yellow-500/50">
+          <CardContainer>
+            <div className="flex flex-col gap-2">
+              <CardDescription className="text-yellow-500">
+                ⚠️ Webhook expired - Click below to reactivate
+              </CardDescription>
+              <Button
+                variant="outline"
+                size="sm"
+                {...(!loading && {
+                  onClick: reqGoogle,
+                })}
+              >
+                {loading ? 'Reactivating...' : 'Reactivate Listener'}
+              </Button>
+            </div>
           </CardContainer>
         </Card>
       ) : (
