@@ -6,6 +6,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import ModalProvider from '@/providers/modal-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { BillingProvider } from '@/providers/billing-provider'
+import '@/lib/env-validation' // Validate environment on startup
 
 const font = DM_Sans({ subsets: ['latin'] })
 
