@@ -80,6 +80,8 @@ const ContentBasedOnTitle = ({
             databaseId: connection.databaseId,
             workspaceName: connection.workspaceName,
           }))
+        } else {
+          toast.error('Notion connection not found. Please configure Notion in the Connections page first.')
         }
       }
     }

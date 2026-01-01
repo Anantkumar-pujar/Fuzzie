@@ -39,21 +39,45 @@ const ActionButton = ({
   }, [nodeConnection])
 
   const onStoreNotionContent = useCallback(async () => {
+    // Validate Notion configuration before sending
+    if (!nodeConnection.notionNode.databaseId || nodeConnection.notionNode.databaseId.trim() === '') {
+      toast.error('Notion database ID is not configured. Please reconnect Notion in the Connections page.')
+      return
+    }
+    
+    if (!nodeConnection.notionNode.accessToken) {
+      toast.error('Notion access token is missing. Please reconnect Notion in the Connections page.')
+      return
+    }
+    
+    if (!nodeConnection.notionNode.content || (nodeConnection.notionNode.content as string).trim() === '') {
+      toast.error('Please enter some content to save to Notion.')
+      return
+    }
+
     console.log(
+      'Notion Config:',
       nodeConnection.notionNode.databaseId,
       nodeConnection.notionNode.accessToken,
       nodeConnection.notionNode.content
     )
-    const response = await onCreateNewPageInDatabase(
-      nodeConnection.notionNode.databaseId,
-      nodeConnection.notionNode.accessToken,
-      nodeConnection.notionNode.content
-    )
-    if (response) {
-      nodeConnection.setNotionNode((prev: any) => ({
-        ...prev,
-        content: '',
-      }))
+    
+    try {
+      const response = await onCreateNewPageInDatabase(
+        nodeConnection.notionNode.databaseId.trim(),
+        nodeConnection.notionNode.accessToken,
+        nodeConnection.notionNode.content
+      )
+      if (response) {
+        toast.success('Successfully created page in Notion!')
+        nodeConnection.setNotionNode((prev: any) => ({
+          ...prev,
+          content: '',
+        }))
+      }
+    } catch (error: any) {
+      toast.error(`Failed to create Notion page: ${error.message}`)
+      console.error('Notion error:', error)
     }
   }, [nodeConnection])
 
@@ -102,13 +126,24 @@ const ActionButton = ({
     }
 
     if (currentService === 'Notion') {
+      // Validate Notion configuration before saving template
+      if (!nodeConnection.notionNode.databaseId || nodeConnection.notionNode.databaseId.trim() === '') {
+        toast.error('Notion database ID is not configured. Please set it up in the Connections page.')
+        return
+      }
+      
+      if (!nodeConnection.notionNode.accessToken) {
+        toast.error('Notion access token is missing. Please reconnect Notion.')
+        return
+      }
+      
       const response = await onCreateNodeTemplate(
         JSON.stringify(nodeConnection.notionNode.content),
         currentService,
         pathname.split('/').pop()!,
         [],
         nodeConnection.notionNode.accessToken,
-        nodeConnection.notionNode.databaseId
+        nodeConnection.notionNode.databaseId.trim()
       )
 
       if (response) {
