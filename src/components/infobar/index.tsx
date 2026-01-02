@@ -20,17 +20,21 @@ type Props = {}
 const InfoBar = (props: Props) => {
   const { credits, tier, setCredits, setTier } = useBilling()
 
-  const onGetPayment = React.useCallback(async () => {
-    const response = await onPaymentDetails();
-    if (response) {
-      setTier(response.tier!);
-      setCredits(response.credits!);
-    }
-  }, [setTier, setCredits]);
-
   useEffect(() => {
-    onGetPayment();
-  }, [onGetPayment]);
+    const onGetPayment = async () => {
+      try {
+        const response = await onPaymentDetails()
+        if (response) {
+          setTier(response.tier!)
+          setCredits(response.credits!)
+        }
+      } catch (error) {
+        console.error('Error fetching payment details:', error)
+      }
+    }
+
+    onGetPayment()
+  }, [setTier, setCredits])
 
   return (
     <div className="flex flex-row justify-end gap-6 items-center px-4 py-4 w-full dark:bg-black ">
