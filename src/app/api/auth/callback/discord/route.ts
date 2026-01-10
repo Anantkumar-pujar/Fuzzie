@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (error) {
     console.log('Discord OAuth error:', error, errorDescription)
     return NextResponse.redirect(
-      `https://localhost:3000/connections?error=${error}`
+      `${process.env.NEXT_PUBLIC_URL}/connections?error=${error}`
     )
   }
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   if (!code) {
     console.log('No code received from Discord')
     return NextResponse.redirect(
-      'https://localhost:3000/connections?error=no_code'
+      `${process.env.NEXT_PUBLIC_URL}/connections?error=no_code`
     )
   }
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     data.append('grant_type', 'authorization_code')
     data.append(
       'redirect_uri',
-      'https://localhost:3000/api/auth/callback/discord'
+      `${process.env.NEXT_PUBLIC_URL}/api/auth/callback/discord`
     )
     data.append('code', code.toString())
 
@@ -60,16 +60,16 @@ export async function GET(req: NextRequest) {
       )
 
       return NextResponse.redirect(
-        `https://localhost:3000/connections?webhook_id=${output.data.webhook.id}&webhook_url=${output.data.webhook.url}&webhook_name=${output.data.webhook.name}&guild_id=${output.data.webhook.guild_id}&guild_name=${UserGuild[0]?.name || ''}&channel_id=${output.data.webhook.channel_id}`
+        `${process.env.NEXT_PUBLIC_URL}/connections?webhook_id=${output.data.webhook.id}&webhook_url=${output.data.webhook.url}&webhook_name=${output.data.webhook.name}&guild_id=${output.data.webhook.guild_id}&guild_name=${UserGuild[0]?.name || ''}&channel_id=${output.data.webhook.channel_id}`
       )
     }
 
     // If no webhook data, redirect back to connections
-    return NextResponse.redirect('https://localhost:3000/connections')
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_URL}/connections`)
   } catch (error: any) {
     console.error('Discord OAuth error:', error.message)
     return NextResponse.redirect(
-      `https://localhost:3000/connections?error=auth_failed`
+      `${process.env.NEXT_PUBLIC_URL}/connections?error=auth_failed`
     )
   }
 }
