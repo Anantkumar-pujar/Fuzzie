@@ -1,0 +1,46 @@
+aws_region    = "ap-south-1"
+project_name  = "fuzzie"
+environment   = "prod"
+desired_count = 2
+db_username   = "fuzzie"
+db_password   = "change-this-long-random-password"
+
+app_secrets_json = <<JSON
+{
+  "NEXT_PUBLIC_URL": "http://replace-with-alb-or-domain",
+  "NEXT_PUBLIC_DOMAIN": "replace-with-alb-or-domain",
+  "NEXT_PUBLIC_SCHEME": "http",
+  "NEXT_PUBLIC_CLERK_SIGN_IN_URL": "/sign-in",
+  "NEXT_PUBLIC_CLERK_SIGN_UP_URL": "/sign-up",
+  "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL": "/dashboard",
+  "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL": "/dashboard",
+  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "",
+  "CLERK_SECRET_KEY": "",
+  "NEXT_PUBLIC_GOOGLE_SCOPES": "https://www.googleapis.com/auth/drive",
+  "NEXT_PUBLIC_OAUTH2_ENDPOINT": "https://accounts.google.com/o/oauth2/v2/auth",
+  "NEXT_PUBLIC_UPLOAD_CARE_CSS_SRC": "https://cdn.jsdelivr.net/npm/@uploadcare/blocks@",
+  "NEXT_PUBLIC_UPLOAD_CARE_SRC_PACKAGE": "/web/lr-file-uploader-regular.min.css",
+  "DISCORD_CLIENT_ID": "",
+  "DISCORD_CLIENT_SECRET": "",
+  "DISCORD_TOKEN": "",
+  "DISCORD_PUBLIC_KEY": "",
+  "NEXT_PUBLIC_DISCORD_REDIRECT": "",
+  "NOTION_API_SECRET": "",
+  "NOTION_CLIENT_ID": "",
+  "NOTION_REDIRECT_URI": "",
+  "NEXT_PUBLIC_NOTION_AUTH_URL": "",
+  "SLACK_SIGNING_SECRET": "",
+  "SLACK_BOT_TOKEN": "",
+  "SLACK_APP_TOKEN": "",
+  "SLACK_CLIENT_ID": "",
+  "SLACK_CLIENT_SECRET": "",
+  "SLACK_REDIRECT_URI": "",
+  "NEXT_PUBLIC_SLACK_REDIRECT": "",
+  "GOOGLE_CLIENT_ID": "",
+  "GOOGLE_CLIENT_SECRET": "",
+  "OAUTH2_REDIRECT_URI": "",
+  "NGROK_URI": "",
+  "CRON_JOB_KEY": "",
+  "STRIPE_SECRET": ""
+}
+JSON

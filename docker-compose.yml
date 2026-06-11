@@ -1,0 +1,47 @@
+services:
+  app:
+    build:
+      context: .
+    image: fuzzie-app:local
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
+      DIRECT_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
+      RUN_MIGRATIONS: "true"
+      NEXT_PUBLIC_URL: http://localhost:3000
+      NEXT_PUBLIC_DOMAIN: localhost:3000
+      NEXT_PUBLIC_SCHEME: http
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /dashboard
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /dashboard
+    env_file:
+      - .env.docker.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fuzzie
+      POSTGRES_PASSWORD: fuzzie_password
+      POSTGRES_DB: fuzzie
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuzzie -d fuzzie"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
