@@ -37,7 +37,7 @@ const InfoBar = (props: Props) => {
   }, [setTier, setCredits])
 
   return (
-    <div className="flex flex-row justify-end gap-6 items-center px-4 py-4 w-full dark:bg-black ">
+    <div className="flex w-full shrink-0 flex-row items-center justify-end gap-6 px-4 py-4 dark:bg-black">
       <span className="flex items-center gap-2 font-bold">
         <p className="text-sm font-light text-gray-600 dark:text-gray-300">Credits</p>
         {tier == 'Unlimited' ? (

@@ -11,6 +11,13 @@
 *::-webkit-scrollbar {
   display: none !important;
 }
+
+/* Firefox and legacy Edge have no ::-webkit-scrollbar, so scrollable areas
+   would reserve a gutter there and shift the layout. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 .bg-radial-gradient {
   background-image: radial-gradient(
     circle at 10% 20%,

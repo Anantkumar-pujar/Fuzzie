@@ -16,39 +16,46 @@ import { ModeToggle } from '../global/mode-toggle'
 
 type Props = {}
 
+//Decorative workflow preview shown under the menu.
+const workflowPreviewNodes = [
+  { Icon: LucideMousePointerClick, className: 'text-gray-700 dark:text-white' },
+  { Icon: GitBranch, className: 'text-gray-600 dark:text-muted-foreground' },
+  { Icon: Database, className: 'text-gray-600 dark:text-muted-foreground' },
+  { Icon: GitBranch, className: 'text-gray-600 dark:text-muted-foreground' },
+]
+
 const MenuOptions = (props: Props) => {
   const pathName = usePathname()
 
   return (
-    <nav className="dark:bg-black h-screen flex items-center flex-col justify-between py-6 px-2">
-      <div className="flex items-center justify-center flex-col gap-8 overflow-y-auto">
-        <Link
-          className="flex font-bold flex-row "
-          href="/"
-        >
-          fuzzie.
-        </Link>
-        <TooltipProvider>
+    <nav className="flex h-full w-20 shrink-0 flex-col items-center gap-8 overflow-y-auto px-2 py-6 dark:bg-black">
+      <Link
+        className="shrink-0 font-bold"
+        href="/"
+      >
+        fuzzie.
+      </Link>
+      <TooltipProvider>
+        <ul className="flex shrink-0 flex-col items-center gap-8">
           {menuOptions.map((menuItem) => (
-            <ul key={menuItem.name}>
+            <li key={menuItem.name}>
               <Tooltip delayDuration={0}>
-                <TooltipTrigger>
-                  <li>
-                    <Link
-                      href={menuItem.href}
-                      className={clsx(
-                        'group h-8 w-8 flex items-center justify-center  scale-[1.5] rounded-lg p-[3px]  cursor-pointer',
-                        {
-                          'dark:bg-[#2F006B] bg-[#EEE0FF] ':
-                            pathName === menuItem.href,
-                        }
-                      )}
-                    >
-                      <menuItem.Component
-                        selected={pathName === menuItem.href}
-                      />
-                    </Link>
-                  </li>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={menuItem.href}
+                    aria-current={
+                      pathName === menuItem.href ? 'page' : undefined
+                    }
+                    className={clsx(
+                      'group flex h-8 w-8 scale-[1.5] cursor-pointer items-center justify-center rounded-lg p-[3px]',
+                      {
+                        'bg-[#EEE0FF] dark:bg-[#2F006B]':
+                          pathName === menuItem.href,
+                      }
+                    )}
+                  >
+                    <menuItem.Component selected={pathName === menuItem.href} />
+                  </Link>
                 </TooltipTrigger>
                 <TooltipContent
                   side="right"
@@ -57,41 +64,35 @@ const MenuOptions = (props: Props) => {
                   <p>{menuItem.name}</p>
                 </TooltipContent>
               </Tooltip>
-            </ul>
+            </li>
           ))}
-        </TooltipProvider>
-        <Separator />
-        <div className="flex items-center flex-col gap-9 dark:bg-[#353346]/30 bg-gray-100 py-4 px-2 rounded-full h-36 overflow-y-auto border-[1px] border-gray-300 dark:border-[#353346]">
-          <div className="relative dark:bg-[#353346]/70 bg-white p-2 rounded-full dark:border-t-[2px] border-[1px] dark:border-t-[#353346] ">
-            <LucideMousePointerClick
-              className="dark:text-white text-gray-700"
+        </ul>
+      </TooltipProvider>
+      <Separator className="shrink-0" />
+      {/* All four nodes plus their gaps, padding and borders measure 290px, so
+      the cap stops the preview stretching into an empty capsule on tall
+      screens. Below that it takes the room that is left and scrolls inside. */}
+      <div
+        aria-hidden
+        className="flex max-h-[292px] min-h-0 flex-1 flex-col items-center gap-9 overflow-y-auto rounded-full border-[1px] border-gray-300 bg-gray-100 px-2 py-4 dark:border-[#353346] dark:bg-[#353346]/30"
+      >
+        {workflowPreviewNodes.map(({ Icon, className }, index) => (
+          <div
+            key={index}
+            className="relative shrink-0 rounded-full border-[1px] bg-white p-2 dark:border-t-[2px] dark:border-t-[#353346] dark:bg-[#353346]/70"
+          >
+            <Icon
+              className={className}
               size={18}
             />
-            <div className="border-l-2 border-muted-foreground/50 h-6 absolute left-1/2 transform translate-x-[-50%] -bottom-[30px]" />
+            {index < workflowPreviewNodes.length - 1 && (
+              <div className="absolute -bottom-[30px] left-1/2 h-6 -translate-x-1/2 border-l-2 border-muted-foreground/50" />
+            )}
           </div>
-          <div className="relative dark:bg-[#353346]/70 bg-white p-2 rounded-full dark:border-t-[2px] border-[1px] dark:border-t-[#353346]">
-            <GitBranch
-              className="text-gray-600 dark:text-muted-foreground"
-              size={18}
-            />
-            <div className="border-l-2 border-muted-foreground/50 h-6 absolute left-1/2 transform translate-x-[-50%] -bottom-[30px]"></div>
-          </div>
-          <div className="relative dark:bg-[#353346]/70 bg-white p-2 rounded-full dark:border-t-[2px] border-[1px] dark:border-t-[#353346] ">
-            <Database
-              className="text-gray-600 dark:text-muted-foreground"
-              size={18}
-            />
-            <div className="border-l-2 border-muted-foreground/50 h-6 absolute left-1/2 transform translate-x-[-50%] -bottom-[30px]"></div>
-          </div>
-          <div className="relative dark:bg-[#353346]/70 bg-white p-2 rounded-full dark:border-t-[2px] border-[1px] dark:border-t-[#353346] ">
-            <GitBranch
-              className="text-gray-600 dark:text-muted-foreground"
-              size={18}
-            />
-          </div>
-        </div>
+        ))}
       </div>
-      <div className="flex items-center justify-center flex-col gap-8 mt-auto">
+      {/* mt-auto pins the toggle to the bottom once the preview stops growing. */}
+      <div className="mt-auto shrink-0">
         <ModeToggle />
       </div>
     </nav>
