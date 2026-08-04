@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Containerizing Fuzzie — A Dockyard Handbook</title>
+<style>
+/* ============================================================
+   TOKENS — blue-biased neutrals + one bold cargo-orange accent
+   ============================================================ */
+:root{
+  --bg:#eceff3;
+  --bg-grid:rgba(13,27,42,.045);
+  --surface:#ffffff;
+  --surface-2:#f5f7fa;
+  --ink:#0d1b2a;
+  --ink-soft:#41566a;
+  --ink-faint:#6b7d90;
+  --line:#d5dde5;
+  --line-strong:#bcc8d4;
+  --accent:#d65a12;
+  --accent-ink:#ffffff;
+  --accent-soft:rgba(214,90,18,.10);
+  --teal:#0f6d78;
+  --teal-soft:rgba(15,109,120,.10);
+  --good:#2f7a4d;
+  --warn:#9a6b12;
+  --crit:#b23b32;
+  --shadow:0 1px 2px rgba(13,27,42,.06),0 8px 24px rgba(13,27,42,.07);
+  --shadow-lg:0 20px 60px rgba(13,27,42,.14);
+  --radius:14px;
+  --radius-sm:9px;
+  --maxw:66ch;
+  --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"Cascadia Code","SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0a1622;--bg-grid:rgba(120,180,220,.05);
+    --surface:#0f1e2e;--surface-2:#13273b;
+    --ink:#e7eef4;--ink-soft:#a7bacc;--ink-faint:#7b91a6;
+    --line:#22384f;--line-strong:#31506e;
+    --accent:#ff8c42;--accent-ink:#160a02;--accent-soft:rgba(255,140,66,.13);
+    --teal:#3fc3d0;--teal-soft:rgba(63,195,208,.12);
+    --good:#5cc98a;--warn:#e0b458;--crit:#f0776b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --shadow-lg:0 24px 70px rgba(0,0,0,.55);
+  }
+}
+/* explicit toggle overrides media query in BOTH directions */
+:root[data-theme="light"]{
+  --bg:#eceff3;--bg-grid:rgba(13,27,42,.045);--surface:#ffffff;--surface-2:#f5f7fa;
+  --ink:#0d1b2a;--ink-soft:#41566a;--ink-faint:#6b7d90;--line:#d5dde5;--line-strong:#bcc8d4;
+  --accent:#d65a12;--accent-ink:#ffffff;--accent-soft:rgba(214,90,18,.10);
+  --teal:#0f6d78;--teal-soft:rgba(15,109,120,.10);
+  --good:#2f7a4d;--warn:#9a6b12;--crit:#b23b32;
+  --shadow:0 1px 2px rgba(13,27,42,.06),0 8px 24px rgba(13,27,42,.07);
+  --shadow-lg:0 20px 60px rgba(13,27,42,.14);
+}
+:root[data-theme="dark"]{
+  --bg:#0a1622;--bg-grid:rgba(120,180,220,.05);--surface:#0f1e2e;--surface-2:#13273b;
+  --ink:#e7eef4;--ink-soft:#a7bacc;--ink-faint:#7b91a6;--line:#22384f;--line-strong:#31506e;
+  --accent:#ff8c42;--accent-ink:#160a02;--accent-soft:rgba(255,140,66,.13);
+  --teal:#3fc3d0;--teal-soft:rgba(63,195,208,.12);
+  --good:#5cc98a;--warn:#e0b458;--crit:#f0776b;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  --shadow-lg:0 24px 70px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--font-body);font-size:17px;line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    linear-gradient(var(--bg-grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--bg-grid) 1px,transparent 1px);
+  background-size:28px 28px;
+}
+::selection{background:var(--accent);color:var(--accent-ink)}
+
+/* progress bar */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:60;transition:width .12s linear}
+
+/* ---------- layout shell ---------- */
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto}
+aside{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:26px 20px 40px;border-right:1px solid var(--line)}
+main{padding:0 clamp(20px,4vw,64px) 120px;min-width:0}
+
+/* ---------- sidebar ---------- */
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+.brand .mark{width:34px;height:34px;border-radius:8px;background:var(--accent);position:relative;flex:none;box-shadow:var(--shadow)}
+.brand .mark::before,.brand .mark::after{content:"";position:absolute;background:var(--accent-ink);opacity:.9}
+.brand .mark::before{left:7px;right:7px;top:9px;height:2px;box-shadow:0 5px 0 var(--accent-ink),0 10px 0 var(--accent-ink)}
+.brand .mark::after{left:9px;bottom:6px;width:2px;height:8px;box-shadow:5px 0 0 var(--accent-ink),10px 0 0 var(--accent-ink)}
+.brand b{font-size:14px;letter-spacing:.02em}
+.brand span{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase}
+.toc{margin-top:22px;list-style:none;padding:0}
+.toc li{margin:1px 0}
+.toc a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--ink-soft);font-size:13.5px;padding:6px 9px;border-radius:8px;border-left:2px solid transparent;transition:background .15s,color .15s}
+.toc a .n{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);min-width:20px}
+.toc a:hover{background:var(--surface-2);color:var(--ink)}
+.toc a.active{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent)}
+.toc a.active .n{color:var(--accent)}
+.themebtn{margin-top:24px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-family:var(--font-mono);font-size:12px;padding:9px;border-radius:9px;cursor:pointer;transition:border-color .15s,color .15s}
+.themebtn:hover{border-color:var(--accent);color:var(--ink)}
+
+/* ---------- hero ---------- */
+.hero{padding:64px 0 34px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 18px;display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--accent)}
+.hero h1{font-size:clamp(2.5rem,6vw,4.2rem);line-height:.98;letter-spacing:-.02em;font-weight:800;margin:0;text-wrap:balance;text-transform:uppercase}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lede{font-size:clamp(1.05rem,2.2vw,1.28rem);color:var(--ink-soft);max-width:60ch;margin:22px 0 0}
+.hero .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.chip{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.03em;padding:6px 11px;border:1px solid var(--line-strong);border-radius:100px;color:var(--ink-soft);background:var(--surface)}
+.chip b{color:var(--accent);font-weight:700}
+
+/* ---------- sections ---------- */
+section{padding:56px 0;border-bottom:1px solid var(--line);scroll-margin-top:10px}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+.sec-head .num{font-family:var(--font-mono);font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.05em}
+h2{font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.08;letter-spacing:-.015em;font-weight:800;margin:0;text-wrap:balance}
+h3{font-size:1.22rem;letter-spacing:-.01em;margin:38px 0 6px;font-weight:750}
+p,li{max-width:var(--maxw)}
+main p{color:var(--ink-soft)}
+main strong{color:var(--ink);font-weight:650}
+a.link{color:var(--teal);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--teal) 40%,transparent)}
+a.link:hover{border-bottom-color:var(--teal)}
+code.inline{font-family:var(--font-mono);font-size:.85em;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--ink)}
+.lead{font-size:1.12rem;color:var(--ink-soft)}
+
+/* ---------- analogy / callouts ---------- */
+.analogy{display:flex;gap:14px;background:var(--teal-soft);border:1px solid color-mix(in srgb,var(--teal) 30%,transparent);border-radius:var(--radius);padding:18px 20px;margin:26px 0;max-width:var(--maxw)}
+.analogy .ic{font-family:var(--font-mono);font-weight:700;color:var(--teal);flex:none;font-size:12px;letter-spacing:.08em;padding-top:2px}
+.analogy p{margin:0;color:var(--ink)}
+.callout{border-radius:var(--radius);padding:16px 18px 16px 46px;margin:22px 0;position:relative;max-width:var(--maxw);border:1px solid var(--line);background:var(--surface)}
+.callout::before{position:absolute;left:16px;top:15px;font-family:var(--font-mono);font-weight:700;font-size:14px}
+.callout p{margin:0;color:var(--ink)}
+.callout .t{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.callout.tip{border-left:3px solid var(--good)}.callout.tip::before{content:"✓";color:var(--good)}.callout.tip .t{color:var(--good)}
+.callout.warn{border-left:3px solid var(--warn)}.callout.warn::before{content:"!";color:var(--warn)}.callout.warn .t{color:var(--warn)}
+.callout.danger{border-left:3px solid var(--crit)}.callout.danger::before{content:"×";color:var(--crit)}.callout.danger .t{color:var(--crit)}
+.callout.note{border-left:3px solid var(--teal)}.callout.note::before{content:"i";color:var(--teal);font-style:italic}.callout.note .t{color:var(--teal)}
+
+/* ---------- accordion (deep dive) ---------- */
+.dive{border:1px solid var(--line);border-radius:var(--radius);margin:20px 0;overflow:hidden;background:var(--surface);max-width:var(--maxw)}
+.dive>button{width:100%;text-align:left;background:none;border:0;padding:15px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;color:var(--ink);font-family:var(--font-body);font-size:1rem;font-weight:650}
+.dive>button .tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:2px 7px}
+.dive>button .arw{margin-left:auto;transition:transform .25s;color:var(--ink-faint)}
+.dive[open] .arw,.dive.open .arw{transform:rotate(90deg)}
+.dive .body{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.dive .body-inner{padding:2px 18px 18px}
+.dive .body-inner p{margin-top:0}
+
+/* ---------- code blocks / terminal ---------- */
+.code{background:#0c1826;border:1px solid var(--line-strong);border-radius:var(--radius);margin:22px 0;overflow:hidden;box-shadow:var(--shadow)}
+:root[data-theme="light"] .code{background:#0c1826}
+.code .bar{display:flex;align-items:center;gap:7px;padding:9px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)}
+.code .bar .dot{width:11px;height:11px;border-radius:50%}
+.code .bar .fname{margin-left:8px;font-family:var(--font-mono);font-size:11.5px;color:#8ea1b5;letter-spacing:.03em}
+.code .bar .copy{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.14);color:#9db0c4;font-family:var(--font-mono);font-size:10.5px;padding:4px 9px;border-radius:6px;cursor:pointer}
+.code .bar .copy:hover{border-color:var(--accent);color:#fff}
+.code pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--font-mono);font-size:13.5px;line-height:1.65;color:#d6e3f0}
+.code pre .cm{color:#6b829a}
+.tok-key{color:#ff9d5c;font-weight:600}.tok-str{color:#8fd6a0}.tok-flag{color:#7fc4e0}.tok-cmt{color:#61788f;font-style:italic}.tok-path{color:#cbb2ff}
+
+/* interactive dockerfile */
+.dfx{display:grid;grid-template-columns:1fr;gap:0;margin:24px 0}
+.dfx .film{background:#0c1826;border:1px solid var(--line-strong);border-radius:var(--radius) var(--radius) 0 0;overflow:hidden}
+.dfx .film .bar{display:flex;align-items:center;gap:7px;padding:9px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)}
+.dfx .film .bar .fname{font-family:var(--font-mono);font-size:11.5px;color:#8ea1b5}
+.dfx .film .bar .hint{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:#6b829a}
+.dfx .lines{font-family:var(--font-mono);font-size:13px;line-height:1.6;padding:10px 0}
+.dfx .ln{display:grid;grid-template-columns:36px 1fr;gap:0;padding:2px 14px;cursor:pointer;color:#d6e3f0;border-left:2px solid transparent}
+.dfx .ln:hover{background:rgba(255,255,255,.05)}
+.dfx .ln.sel{background:var(--accent-soft);border-left-color:var(--accent)}
+.dfx .ln .lno{color:#4c6178;user-select:none;text-align:right;padding-right:12px}
+.dfx .ln.blank{cursor:default;height:10px;padding:0}
+.dfx .ln.stage{color:#8fd6a0}
+.dfx .expl{background:var(--surface);border:1px solid var(--line-strong);border-top:0;border-radius:0 0 var(--radius) var(--radius);padding:18px 20px;min-height:96px}
+.dfx .expl .k{font-family:var(--font-mono);color:var(--accent);font-size:12px;letter-spacing:.05em;display:block;margin-bottom:6px}
+.dfx .expl p{margin:0;color:var(--ink-soft);max-width:none}
+.dfx .expl .ph{color:var(--ink-faint);font-style:italic}
+
+/* ---------- diagrams ---------- */
+.figure{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px;margin:26px 0;box-shadow:var(--shadow)}
+.figcap{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-top:16px;text-align:center}
+
+/* VM vs container */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:640px){.vs{grid-template-columns:1fr}}
+.stackbox{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stackbox h4{margin:0;padding:11px 14px;font-size:12.5px;font-family:var(--font-mono);letter-spacing:.05em;text-transform:uppercase;background:var(--surface-2);border-bottom:1px solid var(--line);color:var(--ink-soft)}
+.layerrow{padding:9px 14px;font-size:13px;border-bottom:1px solid var(--line);color:var(--ink)}
+.layerrow:last-child{border-bottom:0}
+.layerrow.host{background:var(--surface-2);color:var(--ink-faint);font-family:var(--font-mono);font-size:11.5px;letter-spacing:.03em}
+.layerrow.heavy{background:var(--accent-soft)}
+.layerrow.app{background:var(--teal-soft)}
+
+/* pipeline flow */
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+.flow .node{flex:1;min-width:130px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 12px;text-align:center;position:relative;opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s}
+.flow .node.in{opacity:1;transform:none}
+.flow .node .ic{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.flow .node .nm{font-weight:700;font-size:14px;margin-top:4px;color:var(--ink)}
+.flow .node .ds{font-size:11.5px;color:var(--ink-faint);margin-top:3px}
+.flow .arrow{display:flex;align-items:center;color:var(--accent);font-size:20px;padding:0 8px}
+@media(max-width:720px){.flow{flex-direction:column}.flow .arrow{transform:rotate(90deg);padding:4px 0;justify-content:center}}
+
+/* image layers interactive */
+.layers-wrap{display:grid;grid-template-columns:1fr;gap:16px}
+.imgstack{display:flex;flex-direction:column-reverse;gap:4px;perspective:900px}
+.imglayer{border:1px solid var(--line-strong);border-radius:8px;padding:12px 15px;background:var(--surface);display:flex;align-items:center;gap:12px;cursor:default;transition:transform .3s,box-shadow .3s,border-color .3s,background .3s}
+.imglayer:hover{transform:translateX(6px);box-shadow:var(--shadow)}
+.imglayer .idx{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);min-width:18px}
+.imglayer .lc{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);flex:1}
+.imglayer .st{font-family:var(--font-mono);font-size:10.5px;padding:3px 9px;border-radius:100px;letter-spacing:.05em}
+.imglayer.cached{border-color:var(--good);background:color-mix(in srgb,var(--good) 8%,var(--surface))}
+.imglayer.cached .st{background:var(--good);color:#fff}
+.imglayer.rebuilt{border-color:var(--accent);background:var(--accent-soft)}
+.imglayer.rebuilt .st{background:var(--accent);color:var(--accent-ink)}
+.imglayer .st.idle{background:var(--surface-2);color:var(--ink-faint)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.btn{font-family:var(--font-mono);font-size:12.5px;padding:9px 15px;border-radius:9px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer;transition:border-color .15s,transform .1s}
+.btn:hover{border-color:var(--accent)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.05)}
+
+/* runnable terminal */
+.term{background:#0b1420;border:1px solid var(--line-strong);border-radius:var(--radius);margin:22px 0;overflow:hidden;box-shadow:var(--shadow)}
+.term .bar{display:flex;align-items:center;gap:7px;padding:9px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)}
+.term .bar .fname{margin-left:8px;font-family:var(--font-mono);font-size:11.5px;color:#8ea1b5}
+.term .bar .run{margin-left:auto;background:var(--accent);border:0;color:var(--accent-ink);font-family:var(--font-mono);font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:600}
+.term .bar .run:hover{filter:brightness(1.06)}
+.term .scr{padding:15px 18px;font-family:var(--font-mono);font-size:13px;line-height:1.6;color:#cfe0f0;min-height:60px;white-space:pre-wrap;word-break:break-word}
+.term .scr .prompt{color:#5cc98a}
+.term .scr .cmd{color:#ffb37a}
+.term .scr .out{color:#9db4c9}
+.term .scr .ok{color:#5cc98a}
+.term .scr .cur{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.term .scr .cur{animation:none}}
+
+/* quiz */
+.quiz{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin:30px 0;box-shadow:var(--shadow);max-width:var(--maxw)}
+.quiz .qh{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+.quiz .q{font-weight:700;color:var(--ink);margin:0 0 16px;font-size:1.08rem}
+.quiz .opt{display:block;width:100%;text-align:left;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 15px;margin:8px 0;cursor:pointer;color:var(--ink);font-size:.96rem;font-family:var(--font-body);transition:border-color .15s,background .15s}
+.quiz .opt:hover{border-color:var(--line-strong)}
+.quiz .opt.correct{border-color:var(--good);background:color-mix(in srgb,var(--good) 12%,var(--surface))}
+.quiz .opt.wrong{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 10%,var(--surface))}
+.quiz .opt .mk{font-family:var(--font-mono);font-weight:700;margin-right:9px}
+.quiz .fb{margin-top:14px;font-size:.94rem;padding:12px 15px;border-radius:9px;background:var(--surface-2);border-left:3px solid var(--teal);color:var(--ink-soft);display:none}
+.quiz .fb.show{display:block}
+.quiz .fb b{color:var(--ink)}
+
+/* checkpoint banner */
+.checkpoint{display:flex;align-items:center;gap:16px;background:linear-gradient(90deg,var(--accent-soft),transparent);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:16px 20px;margin:30px 0;max-width:var(--maxw)}
+.checkpoint .n{font-family:var(--font-mono);font-size:26px;font-weight:800;color:var(--accent);line-height:1}
+.checkpoint p{margin:0;font-size:.95rem}
+
+/* cheat sheet */
+.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:24px 0}
+.sheet .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.sheet .card h4{margin:0 0 10px;font-size:12px;font-family:var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.sheet .card code{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink);padding:5px 0;border-bottom:1px dashed var(--line)}
+.sheet .card code:last-child{border-bottom:0}
+.sheet .card code .c{color:var(--ink-faint)}
+
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.flow .node{opacity:1;transform:none}}
+
+footer{padding:40px 0 10px;color:var(--ink-faint);font-size:13px;font-family:var(--font-mono)}
+.foot-links{margin-top:8px}
+
+/* mobile: collapse sidebar to top strip */
+.menutoggle{display:none}
+@media(max-width:860px){
+  .shell{grid-template-columns:1fr}
+  aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:16px 20px}
+  aside .toc{display:none}
+  aside.open .toc{display:block}
+  .menutoggle{display:inline-flex;margin-left:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:6px 12px;font-family:var(--font-mono);font-size:12px;cursor:pointer}
+  .brandrow{display:flex;align-items:center}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="shell">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="side">
+    <div class="brandrow">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div><b>THE DOCKYARD</b><span>Containerizing Fuzzie</span></div>
+      </div>
+      <button class="menutoggle" id="menutoggle" aria-label="Toggle contents">≡ Menu</button>
+    </div>
+    <nav aria-label="Table of contents">
+      <ol class="toc" id="toc">
+        <li><a href="#intro"><span class="n">00</span>Start here</a></li>
+        <li><a href="#what"><span class="n">01</span>What is a container?</a></li>
+        <li><a href="#why"><span class="n">02</span>Why Docker?</a></li>
+        <li><a href="#project"><span class="n">03</span>Reading the project</a></li>
+        <li><a href="#ignore"><span class="n">04</span>What to leave out</a></li>
+        <li><a href="#dockerfile"><span class="n">05</span>The Dockerfile</a></li>
+        <li><a href="#layers"><span class="n">06</span>Layers &amp; caching</a></li>
+        <li><a href="#build"><span class="n">07</span>Building the image</a></li>
+        <li><a href="#run"><span class="n">08</span>Running it</a></li>
+        <li><a href="#operate"><span class="n">09</span>Operating containers</a></li>
+        <li><a href="#debug"><span class="n">10</span>Debugging</a></li>
+        <li><a href="#cheat"><span class="n">11</span>Cheat sheet</a></li>
+      </ol>
+    </nav>
+    <button class="themebtn" id="themebtn">◐ Toggle theme</button>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+
+    <!-- HERO -->
+    <header class="hero" id="intro">
+      <p class="eyebrow">A hands-on handbook · zero Docker experience assumed</p>
+      <h1>Put an app<br>in a <em>box</em>.</h1>
+      <p class="lede">This handbook takes <strong>Fuzzie</strong> — a real Next.js + Prisma web app — and containerizes it from absolutely nothing. No prior setup, no existing config. Just you, the source code, and the goal of a single portable artifact that runs the same everywhere.</p>
+      <div class="meta">
+        <span class="chip">App: <b>Next.js 14</b></span>
+        <span class="chip">DB layer: <b>Prisma</b></span>
+        <span class="chip">Listens on <b>:3000</b></span>
+        <span class="chip">Read time: <b>~35 min</b></span>
+      </div>
+      <div class="callout note" style="margin-top:34px">
+        <span class="t">How to use this page</span>
+        <p>Read top to bottom — each chapter builds on the last. Click anything that looks clickable: Dockerfile lines explain themselves, terminals run, layer diagrams react. Checkpoints and quizzes appear after the big ideas. Your progress bar is at the very top.</p>
+      </div>
+    </header>
+
+    <!-- 01 WHAT IS A CONTAINER -->
+    <section id="what">
+      <div class="sec-head"><span class="num">01</span><h2>What is a container, really?</h2></div>
+      <p class="lead reveal">Before any commands, the core idea — because everything else is downstream of it.</p>
+      <p class="reveal">A <strong>container</strong> is your application plus <em>everything it needs to run</em> — the right version of Node, the system libraries, your built code, the settings — sealed into one standardized package. That package runs identically on your laptop, a coworker's machine, or a server in the cloud, because it carries its whole world with it.</p>
+
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>Before shipping containers existed, cargo was loaded loose — barrels, sacks, crates — each handled differently at every port. Then the world agreed on one <strong>standard steel box</strong>. Suddenly any crane, ship, or truck could move any box without caring what was inside. Docker is that standard box, but for software. The crane doesn't need to know if your box holds a Node app or a database — it just moves boxes.</p>
+      </div>
+
+      <h3>Container vs. virtual machine</h3>
+      <p class="reveal">People often ask how this differs from a virtual machine. A VM ships an <strong>entire guest operating system</strong> for every app — gigabytes, slow to boot. A container shares the host's OS kernel and packages only what sits <em>above</em> it. Same isolation for most purposes, a fraction of the weight.</p>
+
+      <div class="figure reveal">
+        <div class="vs">
+          <div class="stackbox">
+            <h4>Virtual machine</h4>
+            <div class="layerrow app">Your app</div>
+            <div class="layerrow">Libraries / dependencies</div>
+            <div class="layerrow heavy">Guest OS &nbsp;(full, ~GBs)</div>
+            <div class="layerrow heavy">Hypervisor</div>
+            <div class="layerrow host">Host operating system</div>
+            <div class="layerrow host">Physical hardware</div>
+          </div>
+          <div class="stackbox">
+            <h4>Container</h4>
+            <div class="layerrow app">Your app</div>
+            <div class="layerrow">Libraries / dependencies</div>
+            <div class="layerrow">Container runtime (Docker)</div>
+            <div class="layerrow host">Host operating system (shared kernel)</div>
+            <div class="layerrow host">Physical hardware</div>
+          </div>
+        </div>
+        <p class="figcap">The container skips the biggest, heaviest layer — a whole guest OS per app.</p>
+      </div>
+
+      <div class="callout tip reveal">
+        <span class="t">Keep these three words straight</span>
+        <p><strong>Dockerfile</strong> = the recipe (a text file). <strong>Image</strong> = the frozen result of following the recipe (read-only). <strong>Container</strong> = a running instance of an image. One image → many containers, like one class → many objects.</p>
+      </div>
+    </section>
+
+    <!-- 02 WHY DOCKER -->
+    <section id="why">
+      <div class="sec-head"><span class="num">02</span><h2>Why bother? From source to running box</h2></div>
+      <p class="lead reveal">The problem Docker solves is summed up in one sentence you've probably heard: <em>"but it works on my machine."</em></p>
+      <p class="reveal">Your app depends on a specific Node version, specific libraries, specific environment variables. If a teammate's machine differs even slightly, it breaks. Docker ends that argument by making the <strong>environment part of the deliverable</strong>. You don't ship instructions to recreate the setup — you ship the setup, already assembled.</p>
+
+      <h3>The journey your code takes</h3>
+      <p class="reveal">Here is the pipeline every containerized app moves through. We'll walk each stage in the chapters ahead — this is the map.</p>
+
+      <div class="figure reveal">
+        <div class="flow" id="flow">
+          <div class="node"><div class="ic">Chapter 03</div><div class="nm">Source code</div><div class="ds">your project folder</div></div>
+          <div class="arrow">→</div>
+          <div class="node"><div class="ic">Chapter 04–05</div><div class="nm">Dockerfile</div><div class="ds">the build recipe</div></div>
+          <div class="arrow">→</div>
+          <div class="node"><div class="ic">Chapter 07</div><div class="nm">docker build</div><div class="ds">run the recipe</div></div>
+          <div class="arrow">→</div>
+          <div class="node"><div class="ic">Artifact</div><div class="nm">Image</div><div class="ds">portable snapshot</div></div>
+          <div class="arrow">→</div>
+          <div class="node"><div class="ic">Chapter 08</div><div class="nm">Container</div><div class="ds">the app, running</div></div>
+        </div>
+        <p class="figcap">Source → recipe → build → image → container. Memorize this shape.</p>
+      </div>
+
+      <div class="callout note reveal">
+        <span class="t">What you install to follow along</span>
+        <p>Just one thing: <strong>Docker Desktop</strong> (Windows/Mac) or the Docker Engine (Linux). It gives you the <code class="inline">docker</code> command and a background service — the "daemon" — that actually does the building and running. Every command in this handbook talks to that daemon.</p>
+      </div>
+
+      <div class="quiz reveal" data-quiz>
+        <p class="qh">Checkpoint · Quiz 1</p>
+        <p class="q">A container is lighter than a virtual machine mainly because…</p>
+        <button class="opt" data-correct="false">It compresses your source code more aggressively.</button>
+        <button class="opt" data-correct="true">It shares the host's OS kernel instead of shipping a full guest OS.</button>
+        <button class="opt" data-correct="false">It removes all of your app's dependencies.</button>
+        <div class="fb"><b>Right idea:</b> a container packages your app and its dependencies but reuses the host kernel — so it skips the multi-gigabyte guest OS a VM carries.</div>
+      </div>
+    </section>
+
+    <!-- 03 PROJECT -->
+    <section id="project">
+      <div class="sec-head"><span class="num">03</span><h2>Reading the project before you build</h2></div>
+      <p class="lead reveal">You can't box up an app you don't understand. So the first real step is detective work: <em>if I had a blank Linux machine, what would I need to do to run this app?</em></p>
+      <p class="reveal">Let's answer that from the project itself. Fuzzie tells us what it needs if we look in the right files.</p>
+
+      <h3>The clues, and what each one dictates</h3>
+      <div class="figure reveal" style="padding:0">
+        <div class="stackbox" style="border:0">
+          <div class="layerrow" style="display:grid;grid-template-columns:170px 1fr;gap:12px"><code class="inline">package.json</code><span>Uses Next.js 14 &amp; Prisma → needs <strong>Node.js</strong> (we'll pick version 20). Its <code class="inline">build</code> script is <code class="inline">next build</code>.</span></div>
+          <div class="layerrow" style="display:grid;grid-template-columns:170px 1fr;gap:12px"><code class="inline">next.config</code><span>Sets <code class="inline">output: 'standalone'</code> → Next produces a <strong>self-contained server</strong> we can ship without the giant dev toolchain.</span></div>
+          <div class="layerrow" style="display:grid;grid-template-columns:170px 1fr;gap:12px"><code class="inline">prisma/schema</code><span>Prisma → we must run <code class="inline">prisma generate</code> at build, and the image needs the <strong>openssl</strong> system library.</span></div>
+          <div class="layerrow" style="display:grid;grid-template-columns:170px 1fr;gap:12px"><code class="inline">/api/health</code><span>A tiny endpoint returning <code class="inline">{status:"ok"}</code> → perfect for a <strong>health check</strong> to prove the app is truly up.</span></div>
+          <div class="layerrow" style="display:grid;grid-template-columns:170px 1fr;gap:12px"><code class="inline">.env files</code><span>Secrets like the database URL and auth keys → these are <strong>runtime config</strong>, never baked into the image.</span></div>
+        </div>
+      </div>
+
+      <h3>The build recipe, in plain words</h3>
+      <p class="reveal">Translating those clues into steps a blank machine would run:</p>
+      <div class="code reveal">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">the manual version (what Docker will automate)</span></div>
+        <pre><span class="tok-cmt"># 1. get Node 20 and the openssl library</span>
+<span class="tok-cmt"># 2. install exact dependencies</span>
+npm ci
+<span class="tok-cmt"># 3. generate the Prisma client + engine</span>
+npx prisma generate
+<span class="tok-cmt"># 4. build the app (produces .next/standalone)</span>
+npm run build
+<span class="tok-cmt"># 5. start the generated server on port 3000</span>
+node server.js</pre>
+      </div>
+
+      <div class="callout warn reveal">
+        <span class="t">The subtle one: two kinds of env var</span>
+        <p>Next.js freezes any <code class="inline">NEXT_PUBLIC_*</code> variable into the browser bundle <strong>at build time</strong>. Secrets (database URL, secret keys) are read <strong>at run time</strong>. This split decides <em>where</em> in the Dockerfile each value goes — remember it; we return to it in Chapter 05.</p>
+      </div>
+    </section>
+
+    <!-- 04 DOCKERIGNORE -->
+    <section id="ignore">
+      <div class="sec-head"><span class="num">04</span><h2>Deciding what to leave out</h2></div>
+      <p class="lead reveal">When you build, Docker copies your project folder to its engine — the "build context." Before writing the recipe, we tell it what <em>not</em> to send.</p>
+
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>Packing a suitcase for a trip, you don't throw in the whole house. You leave behind what you can buy at the destination (toiletries), what's private (your passport stays on you, not in checked luggage), and what won't fit anyway. A <strong>.dockerignore</strong> file is that packing discipline.</p>
+      </div>
+
+      <p class="reveal">Create a file named <code class="inline">.dockerignore</code> next to your Dockerfile:</p>
+      <div class="code reveal">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">.dockerignore</span><button class="copy" data-copy>Copy</button></div>
+<pre>node_modules
+.next
+.git
+.env
+.env.*
+certificates
+npm-debug.log*
+README.md
+Dockerfile</pre>
+      </div>
+
+      <p class="reveal">Each line earns its place for one of three reasons:</p>
+      <div class="dive reveal">
+        <button><span class="tag">why</span>node_modules &amp; .next<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p><strong>They're generated.</strong> We reinstall dependencies and rebuild <em>inside</em> the image on the correct OS. Worse, a <code class="inline">node_modules</code> built on Windows contains native binaries (Prisma's engine, image tooling) that simply crash on the Linux inside the container. Never copy them in.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">why</span>.env and .env.*<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p><strong>They're secrets.</strong> An image is not a vault — anyone who has it can read every file inside. If your database password is baked in, it leaks with the image. We inject secrets when the container <em>runs</em>, not when it's built.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">why</span>.git, README, logs<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p><strong>They're irrelevant to running.</strong> History, docs, and logs add weight and slow every build with no runtime benefit. Smaller context = faster builds and better caching.</p></div></div>
+      </div>
+
+      <div class="callout danger reveal">
+        <span class="t">The classic leak</span>
+        <p>Forgetting to ignore <code class="inline">.env</code> is the single most common security mistake beginners make. If you only remember one line in this file, remember that one.</p>
+      </div>
+    </section>
+
+    <!-- 05 DOCKERFILE -->
+    <section id="dockerfile">
+      <div class="sec-head"><span class="num">05</span><h2>Writing the Dockerfile, line by line</h2></div>
+      <p class="lead reveal">This is the heart of the handbook. A Dockerfile is a recipe read top to bottom. We'll build a <strong>multi-stage</strong> one — heavy work in throwaway stages, only the finished app in the image that ships.</p>
+
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>Think of a restaurant kitchen versus the plate that reaches the table. The kitchen has raw ingredients, mess, and tools — the <em>build stages</em>. The plate carries only the finished dish — the <em>final image</em>. Nobody sends the mixing bowls out to the diner. Multi-stage builds keep the kitchen out of the image.</p>
+      </div>
+
+      <h3>Click any line to learn what it does</h3>
+      <p class="reveal">Below is the complete Dockerfile. Tap a line — the panel beneath explains the instruction and <em>why it exists for this app</em>.</p>
+
+      <div class="dfx reveal" id="dfx">
+        <div class="film">
+          <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">Dockerfile</span><span class="hint">click a line ↓</span></div>
+          <div class="lines" id="dfxlines"></div>
+        </div>
+        <div class="expl" id="dfxexpl">
+          <span class="k">Tip</span>
+          <p class="ph">Select a line above to see a deep explanation here.</p>
+        </div>
+      </div>
+
+      <div class="callout tip reveal">
+        <span class="t">The instruction cheat-sheet</span>
+        <p><code class="inline">FROM</code> pick a base · <code class="inline">WORKDIR</code> set the folder · <code class="inline">COPY</code> bring files in · <code class="inline">RUN</code> execute at build time · <code class="inline">ENV</code> set an environment variable · <code class="inline">ARG</code> a build-time variable · <code class="inline">EXPOSE</code> document a port · <code class="inline">USER</code> drop privileges · <code class="inline">CMD</code> the default command when the container starts.</p>
+      </div>
+
+      <div class="dive reveal">
+        <button><span class="tag">deep dive</span>Why three stages, not one?<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p>A single-stage build leaves everything in the final image: dev dependencies, the whole source tree, the compiler toolchain, caches — often well over a gigabyte. Every extra byte is download time and attack surface.</p>
+          <p style="margin-top:10px">The <strong>deps</strong> stage installs packages. The <strong>builder</strong> stage compiles the app. The <strong>runner</strong> stage starts empty and copies in <em>only</em> the built server, its static files, and the Prisma pieces it needs at runtime. The first two stages are thrown away. Thanks to Next.js standalone output, the result is a fraction of the naive size.</p>
+        </div></div>
+      </div>
+
+      <div class="callout warn reveal">
+        <span class="t">Bind to 0.0.0.0, or it's unreachable</span>
+        <p>Inside a container, a server bound to <code class="inline">localhost</code> can only be reached from <em>within that same container</em>. Setting <code class="inline">HOSTNAME=0.0.0.0</code> tells it to listen on all interfaces so Docker's port mapping can reach it from your machine. Skipping this is a top-five beginner frustration.</p>
+      </div>
+
+      <div class="quiz reveal" data-quiz>
+        <p class="qh">Checkpoint · Quiz 2</p>
+        <p class="q">Where should the secret <code class="inline">DATABASE_URL</code> be placed?</p>
+        <button class="opt" data-correct="false">As an <code class="inline">ENV</code> line inside the Dockerfile.</button>
+        <button class="opt" data-correct="false">Copied in via a <code class="inline">.env</code> file during build.</button>
+        <button class="opt" data-correct="true">Passed in at run time, when you start the container.</button>
+        <div class="fb"><b>Correct:</b> secrets are runtime config. Baking them into the image (or copying <code class="inline">.env</code>) leaks them to anyone who has the image. We'll pass it with <code class="inline">--env-file</code> in Chapter 08.</div>
+      </div>
+    </section>
+
+    <!-- 06 LAYERS -->
+    <section id="layers">
+      <div class="sec-head"><span class="num">06</span><h2>Image layers &amp; the magic of caching</h2></div>
+      <p class="lead reveal">Every instruction in a Dockerfile creates a <strong>layer</strong> — a saved snapshot of the filesystem changes it made. Understanding layers is what turns three-minute rebuilds into three-second ones.</p>
+
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>A layer is like a transparent sheet stacked on an overhead projector. Each instruction adds a new sheet on top. The final image is all the sheets viewed together. Crucially, Docker <strong>saves each sheet</strong> — so if a sheet hasn't changed, it reuses the saved one instead of redrawing it.</p>
+      </div>
+
+      <h3>See caching in action</h3>
+      <p class="reveal">Here are the layers of our build. Press the buttons to simulate what Docker does. Watch which layers get <span style="color:var(--good);font-family:var(--font-mono)">CACHED</span> (reused, instant) versus <span style="color:var(--accent);font-family:var(--font-mono)">REBUILT</span> (re-run).</p>
+
+      <div class="figure reveal">
+        <div class="layers-wrap">
+          <div class="imgstack" id="imgstack"></div>
+          <div class="btnrow">
+            <button class="btn primary" id="firstBuild">First build (nothing cached)</button>
+            <button class="btn" id="editSource">I edited a component →</button>
+            <button class="btn" id="editDeps">I changed package.json →</button>
+          </div>
+          <p class="figcap" id="cacheNote" style="margin-top:4px;text-align:left">Press "First build" to begin.</p>
+        </div>
+      </div>
+
+      <div class="callout tip reveal">
+        <span class="t">The golden rule of ordering</span>
+        <p>Put instructions that <strong>change rarely</strong> (installing dependencies) <em>above</em> instructions that <strong>change constantly</strong> (copying source code). Docker's cache is only valid until the first changed layer — everything below a change must re-run. That's exactly why we <code class="inline">COPY package.json</code> and install <em>before</em> we <code class="inline">COPY . .</code> the source.</p>
+      </div>
+
+      <div class="quiz reveal" data-quiz>
+        <p class="qh">Checkpoint · Quiz 3</p>
+        <p class="q">You change one line in a React component and rebuild. What happens to the <code class="inline">npm ci</code> layer?</p>
+        <button class="opt" data-correct="true">It's reused from cache — dependencies didn't change.</button>
+        <button class="opt" data-correct="false">It re-runs, reinstalling everything from scratch.</button>
+        <button class="opt" data-correct="false">It's deleted permanently.</button>
+        <div class="fb"><b>Exactly:</b> because <code class="inline">package.json</code> is copied and installed <em>before</em> your source, editing a component doesn't invalidate the dependency layer. Only layers from <code class="inline">COPY . .</code> downward re-run.</div>
+      </div>
+    </section>
+
+    <!-- 07 BUILD -->
+    <section id="build">
+      <div class="sec-head"><span class="num">07</span><h2>Building the image</h2></div>
+      <p class="lead reveal">Recipe written. Now we run it. One command turns the Dockerfile into an image.</p>
+
+      <div class="term reveal" data-term="build">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> to simulate <span class="cmd">docker build</span>.</div>
+      </div>
+
+      <p class="reveal">Breaking that command down:</p>
+      <div class="dive reveal">
+        <button><span class="tag">flag</span><code class="inline">docker build</code><span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>The verb: "read a Dockerfile and produce an image." It hands your build context to the Docker daemon, which executes each instruction in a temporary container and snapshots the result.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">flag</span><code class="inline">-t fuzzie-app:local</code><span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p><code class="inline">-t</code> is <em>tag</em> — a human name for the image. Format is <code class="inline">name:version</code>. Without it you'd get an image identified only by a long hash, which is miserable to reference later.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">flag</span>the trailing <code class="inline">.</code><span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>The final <code class="inline">.</code> is the <strong>build context</strong> — the folder Docker sends to the daemon (minus your <code class="inline">.dockerignore</code> entries). It is <em>not</em> the path to the Dockerfile; Docker looks for <code class="inline">./Dockerfile</code> by default.</p></div></div>
+      </div>
+
+      <p class="reveal">Confirm the image now exists in your local library:</p>
+      <div class="term reveal" data-term="images">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> to list images.</div>
+      </div>
+
+      <div class="callout warn reveal">
+        <span class="t">Passing build-time public values</span>
+        <p>Remember the <code class="inline">NEXT_PUBLIC_*</code> split? Those are supplied <em>at build</em> with <code class="inline">--build-arg</code>, e.g. <code class="inline">--build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx</code>. If omitted, the browser bundle bakes in a blank value and client features quietly break.</p>
+      </div>
+    </section>
+
+    <!-- 08 RUN -->
+    <section id="run">
+      <div class="sec-head"><span class="num">08</span><h2>Running the container</h2></div>
+      <p class="lead reveal">An image is a frozen template. Running it brings a live container to life. This is where ports, environment variables, and volumes come in.</p>
+
+      <div class="term reveal" data-term="run">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> to start the container.</div>
+      </div>
+
+      <h3>Ports: opening a door into the box</h3>
+      <p class="reveal">A container is isolated by default — nothing gets in or out. <code class="inline">-p 3000:3000</code> publishes a port as <code class="inline">HOST:CONTAINER</code>. The left number is the port on <em>your</em> machine; the right is the port <em>inside</em> the container where the app listens.</p>
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>The container is a sealed warehouse. <code class="inline">-p 3000:3000</code> installs a single labeled loading door connecting street-side door #3000 to interior dock #3000. Without it, the app is running but there's no door — <code class="inline">localhost:3000</code> reaches nothing.</p>
+      </div>
+      <div class="callout note reveal">
+        <span class="t">EXPOSE ≠ publish</span>
+        <p>The <code class="inline">EXPOSE 3000</code> line in the Dockerfile only <em>documents</em> the port. It does not open it. The actual door is opened by <code class="inline">-p</code> at run time. New users mix these up constantly.</p>
+      </div>
+
+      <h3>Environment variables: the runtime settings</h3>
+      <p class="reveal">Secrets and config are handed to the container as it starts. Best practice is a file, not a long chain of flags:</p>
+      <div class="code reveal">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">run with secrets</span><button class="copy" data-copy>Copy</button></div>
+<pre><span class="tok-key">docker run</span> <span class="tok-flag">-d</span> <span class="tok-flag">--name</span> fuzzie <span class="tok-flag">-p</span> 3000:3000 <span class="tok-flag">--env-file</span> .env.production fuzzie-app:local</pre>
+      </div>
+      <p class="reveal"><code class="inline">-d</code> runs it detached (in the background). <code class="inline">--name fuzzie</code> gives it a friendly handle. <code class="inline">--env-file</code> injects <code class="inline">KEY=value</code> lines as environment variables — this is how <code class="inline">DATABASE_URL</code> reaches the app without ever touching the image.</p>
+
+      <h3>Volumes: keeping data alive</h3>
+      <p class="reveal">Containers are <strong>ephemeral</strong> — delete one and everything written inside vanishes. A <strong>volume</strong> is storage that lives outside the container's lifecycle, so data survives.</p>
+      <div class="analogy reveal">
+        <span class="ic">ANALOGY</span>
+        <p>The container is a hotel room; anything you leave in it is thrown out at checkout. A volume is a safety-deposit box at the front desk — it stays even after you leave and is there for your next stay. Databases <em>always</em> want a volume.</p>
+      </div>
+      <div class="code reveal">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">a database container with a volume</span><button class="copy" data-copy>Copy</button></div>
+<pre><span class="tok-key">docker run</span> <span class="tok-flag">-d</span> <span class="tok-flag">--name</span> db <span class="tok-flag">-v</span> <span class="tok-path">pgdata</span>:/var/lib/postgresql/data postgres:16</pre>
+      </div>
+      <p class="reveal"><code class="inline">-v pgdata:/path</code> mounts a named volume <code class="inline">pgdata</code> at the folder where Postgres stores data. Destroy and recreate the container — the data is still there, in the volume.</p>
+
+      <div class="quiz reveal" data-quiz>
+        <p class="qh">Checkpoint · Quiz 4</p>
+        <p class="q">Your app runs but <code class="inline">localhost:3000</code> shows nothing in the browser. The most likely miss?</p>
+        <button class="opt" data-correct="true">You forgot <code class="inline">-p 3000:3000</code> — no door was opened.</button>
+        <button class="opt" data-correct="false">The image is too large.</button>
+        <button class="opt" data-correct="false">You used <code class="inline">--name</code>.</button>
+        <div class="fb"><b>Most likely:</b> the container is happily running, but without a published port there's no path from your machine into it. (A close cousin: the app bound to <code class="inline">localhost</code> instead of <code class="inline">0.0.0.0</code> inside the box.)</div>
+      </div>
+    </section>
+
+    <!-- 09 OPERATE -->
+    <section id="operate">
+      <div class="sec-head"><span class="num">09</span><h2>Living with your container</h2></div>
+      <p class="lead reveal">Day-to-day operation: see what's running, read logs, step inside, stop, remove, and rebuild after code changes.</p>
+
+      <h3>What's running?</h3>
+      <div class="term reveal" data-term="ps">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> for <span class="cmd">docker ps</span>.</div>
+      </div>
+      <p class="reveal"><code class="inline">docker ps</code> lists running containers (add <code class="inline">-a</code> to include stopped ones). The <code class="inline">STATUS</code> column shows <code class="inline">(healthy)</code> once our health check passes — proof the app answers, not just that the process launched.</p>
+
+      <h3>Reading logs — your first debugging move</h3>
+      <div class="term reveal" data-term="logs">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> for <span class="cmd">docker logs -f fuzzie</span>.</div>
+      </div>
+      <p class="reveal"><code class="inline">docker logs fuzzie</code> prints everything the app wrote to the screen. <code class="inline">-f</code> "follows" it live, like a security-camera feed. If a container crashes on startup, this is where the reason is.</p>
+
+      <h3>Stepping inside a running container</h3>
+      <div class="term reveal" data-term="exec">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">terminal — press Run</span><button class="run">▶ Run</button></div>
+        <div class="scr">Press <span style="color:var(--accent)">▶ Run</span> for <span class="cmd">docker exec -it fuzzie sh</span>.</div>
+      </div>
+      <p class="reveal"><code class="inline">docker exec</code> runs a command <em>inside</em> a container that's already running. <code class="inline">-it</code> makes it interactive (a keyboard + a terminal), and <code class="inline">sh</code> opens a shell. Now you can <code class="inline">ls</code> around and confirm the files you copied really landed where you expect — the ultimate reality check.</p>
+
+      <h3>Stopping, removing, rebuilding</h3>
+      <p class="reveal">Containers are disposable — you don't patch a running one, you replace it. The everyday loop after changing code:</p>
+      <div class="code reveal">
+        <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="fname">the rebuild loop</span><button class="copy" data-copy>Copy</button></div>
+<pre><span class="tok-cmt"># 1. stop and remove the old container</span>
+<span class="tok-key">docker rm</span> <span class="tok-flag">-f</span> fuzzie
+<span class="tok-cmt"># 2. rebuild the image (fast, thanks to caching)</span>
+<span class="tok-key">docker build</span> <span class="tok-flag">-t</span> fuzzie-app:local .
+<span class="tok-cmt"># 3. run the new one</span>
+<span class="tok-key">docker run</span> <span class="tok-flag">-d</span> <span class="tok-flag">--name</span> fuzzie <span class="tok-flag">-p</span> 3000:3000 <span class="tok-flag">--env-file</span> .env.production fuzzie-app:local</pre>
+      </div>
+      <div class="callout note reveal">
+        <span class="t">Why replace instead of update?</span>
+        <p>Immutability is the whole point. The running container always matches an exact, rebuildable image — there's no "well, I also hand-edited a file in there once." That reproducibility is what makes Docker trustworthy in production.</p>
+      </div>
+
+      <div class="dive reveal">
+        <button><span class="tag">reference</span>The verbs you'll use weekly<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><code class="inline">docker stop &lt;name&gt;</code> — politely ask the app to shut down (sends a signal so it can clean up). <br>
+          <code class="inline">docker start &lt;name&gt;</code> — restart a stopped container. <br>
+          <code class="inline">docker rm &lt;name&gt;</code> — delete a stopped container (<code class="inline">-f</code> forces even if running). <br>
+          <code class="inline">docker rmi &lt;image&gt;</code> — delete an image. <br>
+          <code class="inline">docker system prune</code> — sweep up stopped containers and dangling images when disk fills.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- 10 DEBUG -->
+    <section id="debug">
+      <div class="sec-head"><span class="num">10</span><h2>When it doesn't work: debugging</h2></div>
+      <p class="lead reveal">Everyone hits these. Here's the diagnostic ladder and the usual suspects, each tied back to something we built.</p>
+
+      <div class="dive reveal">
+        <button><span class="tag">symptom</span>Container exits immediately<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p><strong>First move:</strong> <code class="inline">docker logs &lt;name&gt;</code>. The startup error is almost always printed there — a missing environment variable, a database it can't reach, a typo in the start command. A container lives only as long as its main process; if that process dies, the container stops.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">symptom</span>"Cannot connect to the Docker daemon"<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>The background Docker service isn't running. On Windows/Mac, <strong>start Docker Desktop</strong> and wait for it to say "running." Every <code class="inline">docker</code> command talks to that daemon — no daemon, no Docker.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">symptom</span>Page loads but has no styling / broken JS<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>The static assets weren't copied. With Next.js standalone you must explicitly <code class="inline">COPY</code> the <code class="inline">.next/static</code> folder into the runner stage — the standalone bundle doesn't include it. Missing that line gives you an unstyled, JavaScript-less page.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">symptom</span>Prisma error about libssl / query engine<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>The <code class="inline">openssl</code> system library is missing from the final stage, or the Prisma engine wasn't generated. That's why our Dockerfile installs <code class="inline">openssl</code> in the runner and runs <code class="inline">prisma generate</code> during the build.</p></div></div>
+      </div>
+      <div class="dive reveal">
+        <button><span class="tag">symptom</span>Build is suddenly slow every time<span class="arw">›</span></button>
+        <div class="body"><div class="body-inner"><p>You likely broke cache ordering — copying all source <em>before</em> installing dependencies makes every code edit reinstall everything. Reorder so <code class="inline">package.json</code> is copied and installed first (Chapter 06).</p></div></div>
+      </div>
+
+      <div class="callout tip reveal">
+        <span class="t">The universal debugging ladder</span>
+        <p><strong>1.</strong> <code class="inline">docker ps -a</code> — did it even stay up? → <strong>2.</strong> <code class="inline">docker logs &lt;name&gt;</code> — why did it stop? → <strong>3.</strong> <code class="inline">docker exec -it &lt;name&gt; sh</code> — is the filesystem what I expect? Ninety percent of problems reveal themselves on these three rungs.</p>
+      </div>
+
+      <h3>Proving it truly works</h3>
+      <p class="reveal">"Running" isn't "working." Verify in layers: <code class="inline">docker ps</code> should show <code class="inline">(healthy)</code>; <code class="inline">curl localhost:3000/api/health</code> should return <code class="inline">{"status":"ok"}</code>; the browser should render the styled page; and a real action (sign-in, a dashboard load) confirms the database connection. Each rung tests a different layer of the stack.</p>
+    </section>
+
+    <!-- 11 CHEAT SHEET -->
+    <section id="cheat" style="border-bottom:0">
+      <div class="sec-head"><span class="num">11</span><h2>The one-page cheat sheet</h2></div>
+      <p class="lead reveal">You made it. Here's everything worth pinning above your desk.</p>
+
+      <div class="checkpoint reveal">
+        <div class="n">✓</div>
+        <p>You can now go from raw source to a running, verified container — and explain <em>why</em> each step exists, not just what to type. That "why" is what separates copying commands from understanding them.</p>
+      </div>
+
+      <div class="sheet reveal">
+        <div class="card">
+          <h4>Build &amp; inspect</h4>
+          <code>docker build -t app:local .</code>
+          <code>docker images <span class="c"># list images</span></code>
+          <code>docker history app:local <span class="c"># layers</span></code>
+        </div>
+        <div class="card">
+          <h4>Run</h4>
+          <code>docker run -d --name app \</code>
+          <code>&nbsp;&nbsp;-p 3000:3000 \</code>
+          <code>&nbsp;&nbsp;--env-file .env.production \</code>
+          <code>&nbsp;&nbsp;app:local</code>
+        </div>
+        <div class="card">
+          <h4>Observe</h4>
+          <code>docker ps -a <span class="c"># all containers</span></code>
+          <code>docker logs -f app <span class="c"># live logs</span></code>
+          <code>docker exec -it app sh <span class="c"># go inside</span></code>
+        </div>
+        <div class="card">
+          <h4>Lifecycle</h4>
+          <code>docker stop app</code>
+          <code>docker start app</code>
+          <code>docker rm -f app <span class="c"># remove</span></code>
+        </div>
+        <div class="card">
+          <h4>Volumes &amp; data</h4>
+          <code>docker volume ls</code>
+          <code>docker run -v data:/path ...</code>
+          <code>docker volume rm data</code>
+        </div>
+        <div class="card">
+          <h4>Cleanup</h4>
+          <code>docker system df <span class="c"># disk usage</span></code>
+          <code>docker system prune <span class="c"># sweep</span></code>
+          <code>docker rmi app:local</code>
+        </div>
+      </div>
+
+      <div class="callout note reveal">
+        <span class="t">Where to go next</span>
+        <p>Two natural follow-ups: <strong>Docker Compose</strong> (declare the app + its database in one file and start both with <code class="inline">docker compose up</code>), and pushing your image to a <strong>registry</strong> so a server can pull and run the exact artifact you built. Both stand on everything in this handbook.</p>
+      </div>
+    </section>
+
+    <footer>
+      <div>THE DOCKYARD HANDBOOK · a from-scratch guide to containerizing Fuzzie</div>
+      <div class="foot-links">Built as a self-contained learning artifact · open it anywhere, no server required.</div>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+/* ================= THEME ================= */
+(function(){
+  var root=document.documentElement, btn=document.getElementById('themebtn');
+  var saved=null;try{saved=localStorage.getItem('dock-theme');}catch(e){}
+  if(saved){root.setAttribute('data-theme',saved);}
+  function cur(){return root.getAttribute('data-theme')|| (window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}
+  btn.addEventListener('click',function(){
+    var next=cur()==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    try{localStorage.setItem('dock-theme',next);}catch(e){}
+    btn.textContent = next==='dark' ? '☀ Light mode' : '☾ Dark mode';
+  });
+  btn.textContent = cur()==='dark' ? '☀ Light mode' : '☾ Dark mode';
+})();
+
+/* ================= MOBILE MENU ================= */
+(function(){
+  var t=document.getElementById('menutoggle'), side=document.getElementById('side');
+  if(t){t.addEventListener('click',function(){side.classList.toggle('open');});}
+  document.querySelectorAll('#toc a').forEach(function(a){
+    a.addEventListener('click',function(){side.classList.remove('open');});
+  });
+})();
+
+/* ================= PROGRESS BAR ================= */
+(function(){
+  var bar=document.getElementById('progress');
+  function upd(){
+    var h=document.documentElement, max=h.scrollHeight-h.clientHeight;
+    bar.style.width=(max>0?(h.scrollTop/max*100):0)+'%';
+  }
+  document.addEventListener('scroll',upd,{passive:true});upd();
+})();
+
+/* ================= SCROLL-SPY + REVEAL ================= */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('#toc a'));
+  var map={};links.forEach(function(l){map[l.getAttribute('href').slice(1)]=l;});
+  var secs=[].slice.call(document.querySelectorAll('section,header.hero'));
+  var spy=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){l.classList.remove('active');});
+        var m=map[e.target.id];if(m)m.classList.add('active');
+      }
+    });
+  },{rootMargin:'-15% 0px -70% 0px'});
+  secs.forEach(function(s){if(s.id)spy.observe(s);});
+
+  var rev=[].slice.call(document.querySelectorAll('.reveal'));
+  var ro=new IntersectionObserver(function(es){
+    es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');ro.unobserve(e.target);}});
+  },{rootMargin:'0px 0px -8% 0px'});
+  rev.forEach(function(r){ro.observe(r);});
+
+  var fnodes=[].slice.call(document.querySelectorAll('#flow .node'));
+  var fo=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        fnodes.forEach(function(n,i){setTimeout(function(){n.classList.add('in');},i*120);});
+        fo.disconnect();
+      }
+    });
+  },{rootMargin:'0px 0px -20% 0px'});
+  if(fnodes[0])fo.observe(fnodes[0]);
+})();
+
+/* ================= ACCORDIONS ================= */
+(function(){
+  document.querySelectorAll('.dive>button').forEach(function(b){
+    b.addEventListener('click',function(){
+      var d=b.parentElement, body=d.querySelector('.body');
+      var open=d.classList.toggle('open');
+      body.style.maxHeight = open ? body.scrollHeight+'px' : '0px';
+    });
+  });
+})();
+
+/* ================= COPY BUTTONS ================= */
+(function(){
+  document.querySelectorAll('[data-copy]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var pre=b.closest('.code').querySelector('pre');
+      var txt=pre.innerText;
+      if(navigator.clipboard){navigator.clipboard.writeText(txt).then(function(){
+        var o=b.textContent;b.textContent='Copied ✓';setTimeout(function(){b.textContent=o;},1400);
+      });}
+    });
+  });
+})();
+
+/* ================= QUIZZES ================= */
+(function(){
+  document.querySelectorAll('[data-quiz]').forEach(function(q){
+    var opts=[].slice.call(q.querySelectorAll('.opt')), fb=q.querySelector('.fb'), done=false;
+    opts.forEach(function(o){
+      o.addEventListener('click',function(){
+        if(done)return;done=true;
+        var correct=o.getAttribute('data-correct')==='true';
+        o.classList.add(correct?'correct':'wrong');
+        if(!correct){opts.forEach(function(x){if(x.getAttribute('data-correct')==='true')x.classList.add('correct');});}
+        opts.forEach(function(x){var mk=document.createElement('span');mk.className='mk';mk.textContent=(x.getAttribute('data-correct')==='true')?'✓':(x===o?'✗':' ');x.insertBefore(mk,x.firstChild);});
+        fb.classList.add('show');
+      });
+    });
+  });
+})();
+
+/* ================= INTERACTIVE DOCKERFILE ================= */
+(function(){
+  var L=[
+    {c:'# syntax=docker/dockerfile:1',cls:'tok-cmt',k:'A parser directive',t:'Opts into the modern Dockerfile syntax and features. It looks like a comment but Docker reads it specially. Harmless to include; nice to have.'},
+    {blank:true},
+    {c:'# ---- Stage 1: install dependencies ----',cls:'tok-cmt',k:'Stage label (comment)',t:'Just a human note. Below it we start the first of three build stages. This one exists only to install packages cleanly and will be thrown away.'},
+    {c:'FROM node:20-bookworm-slim AS deps',cls:'stage',k:'FROM — pick a base image',t:'Every stage starts FROM a base. We use the official Node 20 image, "slim" variant (Debian, trimmed) to stay small. "AS deps" names this stage so later stages can copy from it. Fuzzie needs Node because it is a Next.js app.'},
+    {c:'WORKDIR /app',cls:'',k:'WORKDIR — set the working folder',t:'Creates and moves into /app inside the image. Every following COPY and RUN is relative to here. Prefer this over "RUN cd" — WORKDIR persists across instructions; cd would not.'},
+    {c:'RUN apt-get update && apt-get install -y --no-install-recommends openssl \\',cls:'',k:'RUN — execute at build time',t:'Installs the openssl system library that Prisma\'s engine links against. RUN runs a command while building the image and bakes the result into a layer. --no-install-recommends keeps it lean.'},
+    {c:'    && rm -rf /var/lib/apt/lists/*',cls:'',k:'Clean up in the same layer',t:'Deletes the package index in the SAME RUN that created it. If you cleaned up in a later instruction, the files would still live in this layer, bloating the image. Best practice: make the mess and clean it in one step.'},
+    {c:'COPY package.json package-lock.json ./',cls:'',k:'COPY — only the manifests, first',t:'Copies just the dependency lists — not the whole project yet. This is the caching trick: this layer only changes when your dependencies change, so installs get reused across code edits (Chapter 06).'},
+    {c:'RUN npm ci',cls:'',k:'Install exact dependencies',t:'"npm ci" installs the precise versions locked in package-lock.json and fails if they mismatch. Reproducible, unlike "npm install". This heavy step is cached until package.json changes.'},
+    {blank:true},
+    {c:'# ---- Stage 2: build the app ----',cls:'tok-cmt',k:'Second stage',t:'Now we compile the application. This stage is also discarded — only its output travels onward.'},
+    {c:'FROM node:20-bookworm-slim AS builder',cls:'stage',k:'A fresh stage named builder',t:'Starts clean from the same base. We will pull the installed node_modules from the deps stage rather than reinstalling — that is the multi-stage advantage.'},
+    {c:'WORKDIR /app',cls:'',k:'Set the folder again',t:'Each stage is independent, so we set WORKDIR anew.'},
+    {c:'ENV NEXT_TELEMETRY_DISABLED=1',cls:'',k:'ENV — a build/runtime variable',t:'Turns off Next.js anonymous telemetry during the build. ENV sets an environment variable that persists in this stage (and would persist at runtime if set in the final stage).'},
+    {c:'COPY --from=deps /app/node_modules ./node_modules',cls:'',k:'COPY --from another stage',t:'Reuses the node_modules produced by the deps stage instead of running npm ci again. "--from=deps" is how stages hand artifacts to each other.'},
+    {c:'COPY . .',cls:'',k:'Now copy the source code',t:'Brings in the rest of the project (src, prisma, configs). It comes AFTER the dependency layers on purpose — editing source will not invalidate the cached install.'},
+    {c:'RUN npx prisma generate',cls:'',k:'Generate the Prisma client',t:'Reads prisma/schema.prisma and generates the type-safe database client plus the native query engine. Must happen before the build because the app\'s code imports the Prisma client.'},
+    {c:'RUN npm run build',cls:'',k:'Build → .next/standalone',t:'Runs "next build". Because the app is configured for standalone output, this emits a self-contained server plus a minimal set of files — the key to a tiny final image.'},
+    {blank:true},
+    {c:'# ---- Stage 3: the runtime image ----',cls:'tok-cmt',k:'Final stage — this one ships',t:'Everything above is discarded. This stage starts empty and receives only what the app needs to RUN.'},
+    {c:'FROM node:20-bookworm-slim AS runner',cls:'stage',k:'The image you actually ship',t:'A clean base with none of the source, dev-dependencies, or build tools. Small and low attack-surface.'},
+    {c:'WORKDIR /app',cls:'',k:'Working folder',t:'Where the app will live and run.'},
+    {c:'ENV NODE_ENV=production',cls:'',k:'Production mode',t:'Puts Node and Next.js into production mode — disables dev warnings, enables optimizations.'},
+    {c:'ENV PORT=3000',cls:'',k:'Which port to listen on',t:'The generated Next server reads PORT. Fuzzie listens on 3000.'},
+    {c:'ENV HOSTNAME=0.0.0.0',cls:'',k:'Listen on all interfaces',t:'Critical in containers. Binding to 0.0.0.0 (not localhost) lets Docker\'s port mapping reach the app from your machine. Miss this and the app runs but is unreachable.'},
+    {c:'RUN apt-get update && apt-get install -y --no-install-recommends openssl \\',cls:'',k:'openssl again, for runtime',t:'Prisma\'s engine needs openssl at RUN time too, not only during build. The final stage is independent, so we install it here as well.'},
+    {c:'    && rm -rf /var/lib/apt/lists/* \\',cls:'',k:'Clean the package index',t:'Same tidy-in-place discipline as before.'},
+    {c:'    && addgroup --system --gid 1001 nodejs \\',cls:'',k:'Create a group',t:'Sets up a dedicated system group for the app user. Part of not running as root.'},
+    {c:'    && adduser --system --uid 1001 nextjs',cls:'',k:'Create a non-root user',t:'Containers run as root by default. If the app is compromised, root inside the container is dangerous. We create an unprivileged "nextjs" user to limit the blast radius.'},
+    {c:'COPY --from=builder /app/public ./public',cls:'',k:'Copy static public assets',t:'Images, icons, and other files served directly. Pulled from the builder stage.'},
+    {c:'COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./',cls:'',k:'The self-contained server',t:'This is the heart of the runtime image: the generated server plus its minimal node_modules. --chown gives ownership to our non-root user so it can read its own files.'},
+    {c:'COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static',cls:'',k:'Static build assets',t:'Standalone output does NOT include these automatically. Forget this line and the page loads unstyled with broken JavaScript — a very common gotcha.'},
+    {c:'COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma',cls:'',k:'The Prisma schema',t:'Kept available at runtime (useful for applying database migrations on startup).'},
+    {c:'USER nextjs',cls:'',k:'USER — drop privileges',t:'From here on, everything runs as the unprivileged nextjs user. We did all the root-only work (apt, adduser) above this line.'},
+    {c:'EXPOSE 3000',cls:'',k:'EXPOSE — document the port',t:'Declares that the app listens on 3000. This is documentation only — it does NOT publish the port. You still open it with -p at run time.'},
+    {c:'CMD ["node", "server.js"]',cls:'',k:'CMD — the default start command',t:'What runs when a container starts from this image. It launches the generated standalone server. Unlike RUN (build time), CMD executes at run time, and can be overridden on the command line.'}
+  ];
+  var wrap=document.getElementById('dfxlines'), expl=document.getElementById('dfxexpl');
+  var n=0, sel=null;
+  L.forEach(function(item,i){
+    var row=document.createElement('div');
+    if(item.blank){row.className='ln blank';wrap.appendChild(row);return;}
+    n++;
+    row.className='ln'+(item.cls==='stage'?' stage':'')+(item.cls==='tok-cmt'?'':'');
+    var lno=document.createElement('span');lno.className='lno';lno.textContent=n;
+    var code=document.createElement('span');
+    code.textContent=item.c;
+    if(item.cls==='tok-cmt')code.style.color='#61788f',code.style.fontStyle='italic';
+    if(item.cls==='stage')code.style.color='#8fd6a0';
+    row.appendChild(lno);row.appendChild(code);
+    row.addEventListener('click',function(){
+      if(sel)sel.classList.remove('sel');
+      row.classList.add('sel');sel=row;
+      expl.innerHTML='<span class="k">'+item.k+'</span><p>'+item.t+'</p>';
+    });
+    wrap.appendChild(row);
+  });
+})();
+
+/* ================= IMAGE LAYERS / CACHING ================= */
+(function(){
+  var layers=[
+    {c:'FROM node:20-slim',type:'base'},
+    {c:'RUN apt-get install openssl',type:'base'},
+    {c:'COPY package.json',type:'deps'},
+    {c:'RUN npm ci',type:'deps'},
+    {c:'COPY . .  (source)',type:'src'},
+    {c:'RUN npm run build',type:'src'}
+  ];
+  var stack=document.getElementById('imgstack'), note=document.getElementById('cacheNote');
+  var els=[];
+  layers.forEach(function(l,i){
+    var d=document.createElement('div');d.className='imglayer';
+    d.innerHTML='<span class="idx">'+(i+1)+'</span><span class="lc">'+l.c+'</span><span class="st idle">— idle —</span>';
+    stack.appendChild(d);els.push({el:d,st:d.querySelector('.st'),type:l.type});
+  });
+  var reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function set(i,cls,txt){els[i].el.classList.remove('cached','rebuilt');els[i].st.classList.remove('idle');
+    if(cls)els[i].el.classList.add(cls);els[i].st.textContent=txt;}
+  function reset(){els.forEach(function(e,i){e.el.classList.remove('cached','rebuilt');e.st.className='st idle';e.st.textContent='— idle —';});}
+  function sequence(states,msg){
+    reset();var i=0;
+    function step(){
+      if(i>=states.length){note.textContent=msg;return;}
+      set(i,states[i].c,states[i].t);i++;
+      if(reduce){step();}else{setTimeout(step,260);}
+    }
+    step();
+  }
+  document.getElementById('firstBuild').addEventListener('click',function(){
+    sequence(els.map(function(){return {c:'rebuilt',t:'BUILT'};}),
+      'First build: nothing cached yet, so every layer runs. Docker saves each one for next time.');
+  });
+  document.getElementById('editSource').addEventListener('click',function(){
+    sequence(els.map(function(e){return e.type==='src'?{c:'rebuilt',t:'REBUILT'}:{c:'cached',t:'CACHED'};}),
+      'Edited a component: base + dependency layers are reused instantly. Only the source COPY and build re-run. This is why rebuilds are fast.');
+  });
+  document.getElementById('editDeps').addEventListener('click',function(){
+    sequence(els.map(function(e){return (e.type==='base')?{c:'cached',t:'CACHED'}:{c:'rebuilt',t:'REBUILT'};}),
+      'Changed package.json: the dependency layer is invalidated — and every layer BELOW it must re-run too. The cache is only valid up to the first change.');
+  });
+})();
+
+/* ================= RUNNABLE TERMINALS ================= */
+(function(){
+  var scripts={
+    build:{cmd:'docker build -t fuzzie-app:local .',out:[
+      {t:'[+] Building 62.4s (18/18) FINISHED',c:'out'},
+      {t:' => [deps 3/4] COPY package.json package-lock.json     0.1s',c:'out'},
+      {t:' => [deps 4/4] RUN npm ci                              21.7s',c:'out'},
+      {t:' => [builder 5/6] RUN npx prisma generate              4.2s',c:'out'},
+      {t:' => [builder 6/6] RUN npm run build                    28.9s',c:'out'},
+      {t:' => [runner] exporting layers                           1.3s',c:'out'},
+      {t:' => => naming to docker.io/library/fuzzie-app:local',c:'out'},
+      {t:'✔ Image built successfully.',c:'ok'}
+    ]},
+    images:{cmd:'docker images',out:[
+      {t:'REPOSITORY    TAG     IMAGE ID       CREATED         SIZE',c:'out'},
+      {t:'fuzzie-app    local   9f3c1a7b2e4d   8 seconds ago   214MB',c:'out'},
+      {t:'← small, thanks to multi-stage + standalone output',c:'ok'}
+    ]},
+    run:{cmd:'docker run -d --name fuzzie -p 3000:3000 --env-file .env.production fuzzie-app:local',out:[
+      {t:'7d1e9a4c8b2f5e0a1c6d3b8f2a9e4c7d0b5a1f8e3c6d9b2a4f7e1c8d0b3a6f9e',c:'out'},
+      {t:'✔ Container "fuzzie" is now running → http://localhost:3000',c:'ok'}
+    ]},
+    ps:{cmd:'docker ps',out:[
+      {t:'CONTAINER ID   IMAGE              STATUS                    PORTS',c:'out'},
+      {t:'7d1e9a4c8b2f   fuzzie-app:local   Up 12 seconds (healthy)   0.0.0.0:3000->3000/tcp',c:'out'},
+      {t:'← (healthy) means the /api/health check passed',c:'ok'}
+    ]},
+    logs:{cmd:'docker logs -f fuzzie',out:[
+      {t:'  ▲ Next.js 14.2  (standalone)',c:'out'},
+      {t:'  - Local:    http://0.0.0.0:3000',c:'out'},
+      {t:' ✓ Ready in 412ms',c:'ok'},
+      {t:'  GET /api/health 200 in 6ms',c:'out'}
+    ]},
+    exec:{cmd:'docker exec -it fuzzie sh',out:[
+      {t:'/app $ ls',c:'out'},
+      {t:'.next  node_modules  prisma  public  server.js',c:'out'},
+      {t:'/app $ ls .next/static',c:'out'},
+      {t:'chunks  css  media   ← static assets present ✓',c:'ok'},
+      {t:'/app $ exit',c:'out'}
+    ]}
+  };
+  var reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  document.querySelectorAll('[data-term]').forEach(function(term){
+    var key=term.getAttribute('data-term'), scr=term.querySelector('.scr'), btn=term.querySelector('.run');
+    var s=scripts[key];if(!s)return;
+    btn.addEventListener('click',function(){
+      btn.disabled=true;scr.innerHTML='';
+      var line=document.createElement('div');
+      line.innerHTML='<span class="prompt">$</span> <span class="cmd"></span><span class="cur"></span>';
+      scr.appendChild(line);
+      var cmdEl=line.querySelector('.cmd'), cur=line.querySelector('.cur'), i=0;
+      function type(){
+        if(i<s.cmd.length){cmdEl.textContent+=s.cmd[i++];setTimeout(type,reduce?0:16);}
+        else{cur.remove();printOut(0);}
+      }
+      function printOut(j){
+        if(j>=s.out.length){btn.disabled=false;return;}
+        var o=document.createElement('div');o.className=s.out[j].c;o.textContent=s.out[j].t;
+        scr.appendChild(o);
+        setTimeout(function(){printOut(j+1);},reduce?0:180);
+      }
+      if(reduce){cmdEl.textContent=s.cmd;cur.remove();printOut(0);}else{type();}
+    });
+  });
+})();
+</script>
+</body>
+</html>

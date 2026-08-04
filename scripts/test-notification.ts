@@ -3,7 +3,7 @@ import fetch from 'node-fetch'
 async function testNotificationEndpoint() {
   console.log('\n=== TESTING GOOGLE DRIVE NOTIFICATION ENDPOINT ===\n')
   
-  const url = 'https://localhost:3000/api/drive-activity/notification'
+  const url = 'https://localhost:3001/api/drive-activity/notification'
   
   console.log(`Testing URL: ${url}\n`)
   

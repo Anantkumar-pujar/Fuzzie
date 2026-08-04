@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Code not provided', { status: 400 })
   }
 
+  // Single source of truth for redirects — resolves per environment.
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://localhost:3001'
+
   try {
     // Make a POST request to Slack's OAuth endpoint to exchange the code for an access token
     const response = await fetch('https://slack.com/api/oauth.v2.access', {
@@ -42,7 +45,7 @@ export async function GET(req: NextRequest) {
 
       // Handle the successful OAuth flow and redirect the user
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_URL}/connections?app_id=${appId}&authed_user_id=${userId}&authed_user_token=${userToken}&slack_access_token=${accessToken}&bot_user_id=${botUserId}&team_id=${teamId}&team_name=${teamName}`
+        `${baseUrl}/connections?app_id=${appId}&authed_user_id=${userId}&authed_user_token=${userToken}&slack_access_token=${accessToken}&bot_user_id=${botUserId}&team_id=${teamId}&team_name=${teamName}`
       )
     }
   } catch (error) {

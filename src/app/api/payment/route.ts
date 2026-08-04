@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     apiVersion: '2023-10-16',
   })
   const data = await req.json()
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://localhost:3001'
   const session = await stripe.checkout.sessions.create({
     line_items: [
       {
@@ -49,9 +50,8 @@ export async function POST(req: NextRequest) {
       },
     ],
     mode: 'subscription',
-    success_url:
-      `${process.env.NEXT_PUBLIC_URL}/billing?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_URL}/billing`,
+    success_url: `${baseUrl}/billing?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/billing`,
   })
   return NextResponse.json(session.url)
 }

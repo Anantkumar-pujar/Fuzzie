@@ -25,7 +25,7 @@ export const activateGoogleDriveListener = async () => {
     }
 
     // Call the API endpoint to set up the listener
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://localhost:3001'
     const response = await fetch(`${baseUrl}/api/drive-activity`, {
       method: 'GET',
       headers: {

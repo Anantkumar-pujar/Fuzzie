@@ -8,11 +8,23 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# Schema-management tooling: the full dependency tree (incl. the Prisma CLI and
+# its deps) plus the schema — but NOT the Next.js build. Used by the one-off
+# "migrate" service to run `prisma db push` against a fresh database.
+FROM node:20-bookworm-slim AS migrator
+WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_PUBLIC_URL=http://localhost:3000
-ARG NEXT_PUBLIC_DOMAIN=localhost:3000
+ARG NEXT_PUBLIC_URL=http://localhost:3001
+ARG NEXT_PUBLIC_DOMAIN=localhost:3001
 ARG NEXT_PUBLIC_SCHEME=http
 ARG NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 ARG NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
@@ -54,7 +66,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
-ENV PORT=3000
+ENV PORT=3001
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
@@ -74,8 +86,8 @@ COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]

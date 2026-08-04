@@ -4,8 +4,12 @@ const path = require('path');
 const http = require('http');
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
+
+// Ensure the Next.js standalone server binds to the same port/host we log below.
+process.env.PORT = String(PORT);
+process.env.HOSTNAME = process.env.HOSTNAME || HOST;
 
 console.log('========================================');
 console.log('🚀 Fuzzie Workflow Automation');

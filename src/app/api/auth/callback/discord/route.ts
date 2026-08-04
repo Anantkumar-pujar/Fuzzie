@@ -7,11 +7,15 @@ export async function GET(req: NextRequest) {
   const error = req.nextUrl.searchParams.get('error')
   const errorDescription = req.nextUrl.searchParams.get('error_description')
 
+  // Single source of truth for redirects — resolves per environment
+  // (dev: https://localhost:3001, docker: http://localhost:3001, prod: public URL).
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://localhost:3001'
+
   // Handle OAuth errors (user cancelled or denied)
   if (error) {
     console.log('Discord OAuth error:', error, errorDescription)
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_URL}/connections?error=${error}`
+      `${baseUrl}/connections?error=${error}`
     )
   }
 
@@ -19,7 +23,7 @@ export async function GET(req: NextRequest) {
   if (!code) {
     console.log('No code received from Discord')
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_URL}/connections?error=no_code`
+      `${baseUrl}/connections?error=no_code`
     )
   }
 
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
     data.append('grant_type', 'authorization_code')
     data.append(
       'redirect_uri',
-      `${process.env.NEXT_PUBLIC_URL}/api/auth/callback/discord`
+      `${baseUrl}/api/auth/callback/discord`
     )
     data.append('code', code.toString())
 
@@ -60,16 +64,16 @@ export async function GET(req: NextRequest) {
       )
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_URL}/connections?webhook_id=${output.data.webhook.id}&webhook_url=${output.data.webhook.url}&webhook_name=${output.data.webhook.name}&guild_id=${output.data.webhook.guild_id}&guild_name=${UserGuild[0]?.name || ''}&channel_id=${output.data.webhook.channel_id}`
+        `${baseUrl}/connections?webhook_id=${output.data.webhook.id}&webhook_url=${output.data.webhook.url}&webhook_name=${output.data.webhook.name}&guild_id=${output.data.webhook.guild_id}&guild_name=${UserGuild[0]?.name || ''}&channel_id=${output.data.webhook.channel_id}`
       )
     }
 
     // If no webhook data, redirect back to connections
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_URL}/connections`)
+    return NextResponse.redirect(`${baseUrl}/connections`)
   } catch (error: any) {
     console.error('Discord OAuth error:', error.message)
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_URL}/connections?error=auth_failed`
+      `${baseUrl}/connections?error=auth_failed`
     )
   }
 }

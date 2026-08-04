@@ -2,18 +2,23 @@ services:
   app:
     build:
       context: .
+      # NEXT_PUBLIC_* values are inlined into the browser bundle at BUILD time,
+      # so the Clerk publishable key must be passed here as a build arg — setting
+      # it only under `environment` (runtime) leaves the client bundle broken.
+      # The value is interpolated from your shell / a project-level .env file.
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
     image: fuzzie-app:local
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: 3001
       HOSTNAME: 0.0.0.0
       DATABASE_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
       DIRECT_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
-      RUN_MIGRATIONS: "true"
-      NEXT_PUBLIC_URL: http://localhost:3000
-      NEXT_PUBLIC_DOMAIN: localhost:3000
+      NEXT_PUBLIC_URL: http://localhost:3001
+      NEXT_PUBLIC_DOMAIN: localhost:3001
       NEXT_PUBLIC_SCHEME: http
       NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
       NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
@@ -24,7 +29,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
+
+  # One-off schema initializer. This project has no migrations history, so it
+  # applies the schema with `prisma db push`. It builds the `builder` stage,
+  # which carries the full Prisma CLI + dependencies (the slim app image does
+  # not). Runs to completion once, then the app starts.
+  migrate:
+    build:
+      context: .
+      target: migrator
+    image: fuzzie-migrate:local
+    command: ["npx", "prisma", "db", "push", "--skip-generate", "--accept-data-loss"]
+    environment:
+      DATABASE_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
+      DIRECT_URL: postgresql://fuzzie:fuzzie_password@postgres:5432/fuzzie?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   postgres:
     image: postgres:16-alpine
