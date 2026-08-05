@@ -1,0 +1,33 @@
+export const metadata = {
+  title: 'Credits & billing | Fuzzie Guide',
+  description: 'What costs a credit and what happens when you run out.',
+}
+
+# Credits & billing
+
+**One workflow run costs one credit** — per run, not per action. A workflow that
+posts to Discord, Slack and Notion in a single run still costs one.
+
+<StatGrid>
+  <StatCard label="Free" value="10" />
+  <StatCard label="Pro" value="100" />
+  <StatCard label="Unlimited" value="∞" tone="green" />
+</StatGrid>
+
+Change plan on [Billing](/billing). Your balance is in the top bar on every page.
+
+## Free
+
+Building and editing workflows, connecting apps, publishing, and browsing logs
+never cost credits. Only runs do.
+
+## Running out
+
+<Callout variant="warn">
+  **At zero, workflows go silent.** Triggers are rejected and nothing runs — but
+  no error appears in your logs, because the run never starts. If your workflows
+  have gone quiet, check your balance before assuming something is broken.
+</Callout>
+
+Nothing is lost. Workflows stay published and resume as soon as you have
+credits. Accounts on **Unlimited** skip the balance check entirely.

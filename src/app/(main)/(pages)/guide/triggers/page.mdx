@@ -1,0 +1,40 @@
+export const metadata = {
+  title: 'Triggers | Fuzzie Guide',
+  description: 'How the Google Drive listener works and why it needs activating.',
+}
+
+# Triggers
+
+A trigger is what starts a workflow. Today that means **Google Drive file
+changes**.
+
+## Connecting and activating are separate
+
+Connecting grants access. Activating registers a listener with Google that
+pushes change notifications to Fuzzie. Do both on
+[Connections](/connections) — when it is live the panel reads *Listener is
+active and monitoring your Google Drive*.
+
+<Callout variant="warn">
+  **Google's listeners expire.** If workflows stop firing after working fine for
+  a while, reactivate the trigger. This is the most common cause of "it stopped
+  working".
+</Callout>
+
+## What happens on a file change
+
+1. Google notifies Fuzzie.
+2. Fuzzie checks you have credits.
+3. Your **published** workflows run their actions in order.
+4. The run is written to [Logs](/logs) and one credit is deducted.
+
+## Cooldown
+
+Runs are limited to **one every 10 seconds** per account. Changes arriving
+faster are rejected, not queued — so renaming twenty files at once will not
+produce twenty runs. This stops a bulk operation draining your credits.
+
+## Trigger types in your logs
+
+<Pill>google_drive</Pill> a file change &nbsp;·&nbsp; <Pill>manual</Pill> started
+by hand &nbsp;·&nbsp; <Pill>cron</Pill> on a schedule

@@ -1,0 +1,41 @@
+export const metadata = {
+  title: 'Quickstart | Fuzzie Guide',
+  description: 'Connect Google Drive, build a workflow, and publish it.',
+}
+
+# Quickstart
+
+From an empty account to a workflow running on its own — about five minutes.
+
+<Steps>
+  <Step n={1} title="Connect Google Drive">
+    On [Connections](/connections), connect the Google account you want watched.
+  </Step>
+  <Step n={2} title="Activate the Drive trigger">
+    Same page, click **Activate Google Drive Trigger**. Connecting alone is not
+    enough — see [Triggers](/guide/triggers).
+  </Step>
+  <Step n={3} title="Connect an app to act on">
+    Discord, Slack or Notion. Each one you connect becomes available in the
+    editor.
+  </Step>
+  <Step n={4} title="Build the workflow">
+    On [Workflows](/workflows), create one, then add a Google Drive trigger node
+    and one or more action nodes. Each action needs its own config — see
+    [Actions](/guide/actions).
+  </Step>
+  <Step n={5} title="Publish it">
+    Toggle the workflow to **Published**.
+  </Step>
+</Steps>
+
+<Callout variant="warn">
+  **This is the step people miss.** Only published workflows run. An unpublished
+  workflow is skipped entirely when a trigger fires.
+</Callout>
+
+## Check it worked
+
+Change a file in the connected Drive account, then open [Logs](/logs). A new run
+should appear within a few seconds. If it does not,
+[Troubleshooting](/guide/troubleshooting) lists the usual causes in order.

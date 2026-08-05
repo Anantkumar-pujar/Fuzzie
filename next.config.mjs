@@ -1,6 +1,10 @@
+import createMDX from '@next/mdx'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  //Guide pages are authored as .mdx alongside the app routes.
+  pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
   images: {
     remotePatterns: [
       {
@@ -22,4 +26,6 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+const withMDX = createMDX({})
+
+export default withMDX(nextConfig)

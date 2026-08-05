@@ -1,0 +1,27 @@
+import GuideIndex from './_components/guide-index'
+
+export const metadata = {
+  title: 'Guide | Fuzzie',
+  description: 'Learn how to build and run automation workflows in Fuzzie.',
+}
+
+# Welcome to Fuzzie
+
+A **workflow** watches for something happening — a file changing in Google Drive
+— then runs the actions you configured, like posting to Discord, Slack or Notion.
+
+<GuideIndex />
+
+## The four pieces
+
+- **Connections** — your credentials for Google Drive, Discord, Slack, Notion.
+- **Workflows** — one trigger plus one or more actions.
+- **Publishing** — the switch that makes a workflow live.
+- **Logs** — a record of every run.
+
+<Callout variant="warn">
+  **Only published workflows run.** An unpublished workflow is a draft and is
+  skipped entirely when a trigger fires.
+</Callout>
+
+New here? Start with the [Quickstart](/guide/quickstart).

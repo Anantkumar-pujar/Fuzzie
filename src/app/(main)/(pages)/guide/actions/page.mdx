@@ -1,0 +1,42 @@
+export const metadata = {
+  title: 'Actions | Fuzzie Guide',
+  description: 'What Discord, Slack and Notion each need before they will run.',
+}
+
+# Actions
+
+Actions are what a workflow does once its trigger fires. They run in the order
+they appear in the editor.
+
+<Callout variant="warn">
+  **An action only runs if it is fully configured.** Anything missing is marked
+  <Pill>skipped</Pill> in the log with the reason *Incomplete configuration*, and
+  the rest of the workflow carries on. A skip is not a failure — but nothing
+  happened either.
+</Callout>
+
+<CardGrid>
+  <GuideCard title="Discord" meta="Needs: message template">
+    Connect on [Connections](/connections) and pick a server and channel — that
+    creates the webhook Fuzzie posts through.
+  </GuideCard>
+  <GuideCard title="Slack" meta="Needs: message template + channels">
+    Both are required. A message with no channels selected has nowhere to go, so
+    it is skipped. Reconnect if you remove the app from your workspace.
+  </GuideCard>
+  <GuideCard title="Notion" meta="Needs: database + content template">
+    Notion scopes access **per database**, not per workspace — authorising the
+    wrong one is a common cause of failures.
+  </GuideCard>
+</CardGrid>
+
+## Why Notion fails more often
+
+Notion validates each entry against the database schema as it is created. If the
+database has required properties your template does not fill, the entry is
+rejected and the error text is written to the log.
+
+## Actions are independent
+
+Actions do not pass data to each other — each acts on the same trigger
+information. One failing does not stop the ones after it.

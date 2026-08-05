@@ -1,0 +1,55 @@
+export const metadata = {
+  title: 'Troubleshooting | Fuzzie Guide',
+  description: 'Read the Logs page and fix the usual causes of a silent workflow.',
+}
+
+# Troubleshooting
+
+## My workflow never runs
+
+In order of how often each turns out to be the cause:
+
+<Steps>
+  <Step n={1} title="Is it published?">
+    Drafts are skipped entirely. Check the toggle on [Workflows](/workflows).
+  </Step>
+  <Step n={2} title="Is the Drive listener still active?">
+    Google's listeners expire. Reactivate on [Connections](/connections).
+  </Step>
+  <Step n={3} title="Do you have credits left?">
+    At zero, triggers are rejected silently. Check the top bar.
+  </Step>
+  <Step n={4} title="Right Google account?">
+    Fuzzie watches the account you connected, not every account you are signed
+    into.
+  </Step>
+  <Step n={5} title="Inside the 10 second cooldown?">
+    Rapid changes are rejected rather than queued.
+  </Step>
+</Steps>
+
+<Callout>
+  **It worked yesterday and stopped today** is almost always an expired Drive
+  listener or an empty credit balance. Both are quiet — neither leaves an error,
+  because the run never starts.
+</Callout>
+
+## Reading a run
+
+A run is <Pill>success</Pill> or <Pill>failed</Pill>. Expand it to see each
+action, which carries its own result.
+
+<Callout variant="warn">
+  **A run can be `success` while containing skipped actions.** If a message never
+  arrived, open the run rather than trusting the top-level status.
+</Callout>
+
+## One app got nothing
+
+- <Pill>skipped</Pill> — the node is missing something required, like a Slack
+  node with no channels. See [Actions](/guide/actions).
+- <Pill>failed</Pill> — the app rejected the request. Usually Notion refusing an
+  entry that does not match its database schema.
+
+Still stuck? Reconnect the app on [Connections](/connections) — that refreshes
+the stored credentials and resolves most authentication failures.

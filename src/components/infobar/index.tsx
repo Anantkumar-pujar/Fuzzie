@@ -1,7 +1,8 @@
 'use client'
 import React, { useEffect } from 'react'
 import { ModeToggle } from '../global/mode-toggle'
-import { Book, Headphones, Search } from 'lucide-react'
+import { Headphones, Search } from 'lucide-react'
+import GuideDrawer from './guide-drawer'
 //import Templates from '../icons/cloud_download'
 import { Input } from '@/components/ui/input'
 
@@ -65,16 +66,7 @@ const InfoBar = (props: Props) => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <TooltipProvider>
-        <Tooltip delayDuration={0}>
-          <TooltipTrigger>
-            <Book />
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Guide</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <GuideDrawer />
       <UserButton />
     </div>
   )
