@@ -1,10 +1,9 @@
 'use client'
 import React, { useEffect } from 'react'
 import { ModeToggle } from '../global/mode-toggle'
-import { Headphones, Search } from 'lucide-react'
+import { Headphones } from 'lucide-react'
 import GuideDrawer from './guide-drawer'
-//import Templates from '../icons/cloud_download'
-import { Input } from '@/components/ui/input'
+import QuickSearch from '@/components/search/quick-search'
 
 import {
   Tooltip,
@@ -49,13 +48,7 @@ const InfoBar = (props: Props) => {
           </span>
         )}
       </span>
-      <span className="flex items-center rounded-full bg-muted px-4">
-        <Search />
-        <Input
-          placeholder="Quick Search"
-          className="border-none bg-transparent"
-        />
-      </span>
+      <QuickSearch />
       <TooltipProvider>
         <Tooltip delayDuration={0}>
           <TooltipTrigger>
